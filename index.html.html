@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文章進度控管儀表板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f3;min-height:100vh}
+.page{max-width:1100px;margin:0 auto;padding:1.5rem}
+.header{margin-bottom:1.5rem}
+.header h1{font-size:20px;font-weight:500;color:#1a1a1a;margin-bottom:4px}
+.header p{font-size:12px;color:#888780}
+
+.tab-bar{display:flex;border-bottom:1px solid #e0dfd8;margin-bottom:1.5rem}
+.tab{padding:9px 22px;font-size:13px;cursor:pointer;border:none;border-bottom:2.5px solid transparent;color:#888780;background:none;margin-bottom:-1px;transition:color .15s}
+.tab.active{color:#1a1a1a;border-bottom-color:#185FA5;font-weight:500}
+.tab:hover:not(.active){color:#1a1a1a}
+.view{display:none}.view.active{display:block}
+
+.mcard-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:1.5rem}
+.mcard{background:#fff;border-radius:8px;padding:1rem;border:1px solid #e8e8e4}
+.mcard-label{font-size:11px;color:#888780;margin-bottom:5px}
+.mcard-val{font-size:26px;font-weight:500;line-height:1;color:#1a1a1a}
+.mcard-sub{font-size:11px;color:#b4b2a9;margin-top:4px}
+.mcard.ok .mcard-val{color:#0F6E56}
+.mcard.warn .mcard-val{color:#854F0B}
+.mcard.danger .mcard-val{color:#A32D2D}
+
+.kpi-block{background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem}
+.kpi-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:6px}
+.kpi-title{font-size:14px;font-weight:500}
+.kpi-meta{font-size:11px;color:#888780}
+.progress-row{display:grid;grid-template-columns:56px 1fr 130px 52px;align-items:center;gap:8px;margin-bottom:9px}
+.p-label{font-size:11px;color:#888780}
+.p-track{height:6px;background:#f1efe8;border-radius:3px;position:relative;overflow:hidden}
+.p-forecast{position:absolute;top:0;left:0;height:100%;border-radius:3px}
+.p-actual{position:absolute;top:0;left:0;height:100%;border-radius:3px}
+.p-nums{font-size:11px;color:#1a1a1a}
+.p-nums span{color:#b4b2a9}
+.pct-pill{font-size:10px;padding:2px 6px;border-radius:8px;font-weight:500;text-align:center;white-space:nowrap}
+.pct-ok{background:#EAF3DE;color:#3B6D11}
+.pct-warn{background:#FAEEDA;color:#854F0B}
+.pct-danger{background:#FCEBEB;color:#A32D2D}
+.legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#888780;margin-top:10px}
+.ld{width:10px;height:4px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:4px}
+
+.alert-strip{border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border:1px solid}
+.alert-strip.danger{background:#FCEBEB;border-color:#F7C1C1}
+.alert-strip.warn{background:#FAEEDA;border-color:#FAC775}
+.a-title{font-size:13px;font-weight:500}
+.a-detail{font-size:11px;margin-top:2px}
+.alert-strip.danger .a-title{color:#A32D2D}
+.alert-strip.danger .a-detail{color:#E24B4A}
+.alert-strip.warn .a-title{color:#854F0B}
+.alert-strip.warn .a-detail{color:#BA7517}
+.a-count{font-size:22px;font-weight:500}
+.alert-strip.danger .a-count{color:#A32D2D}
+.alert-strip.warn .a-count{color:#854F0B}
+
+.chart-wrap{position:relative;width:100%}
+
+.pipeline-wrap{background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.pipeline-title{font-size:14px;font-weight:500;margin-bottom:2px}
+.pipeline-sub{font-size:11px;color:#888780;margin-bottom:16px}
+.pipe-divider{display:flex;align-items:center;gap:8px;margin:12px 0}
+.pipe-divider-line{flex:1;height:1px;background:#e8e8e4}
+.pipe-divider-label{font-size:10px;color:#b4b2a9;white-space:nowrap;padding:0 4px}
+
+.dual-bar-row{display:grid;grid-template-columns:100px 1fr 40px;align-items:center;gap:8px;margin-bottom:6px}
+.dual-bar-label{font-size:12px;text-align:right;white-space:nowrap;color:#888780}
+.dual-bar-track{height:22px;background:#f1efe8;border-radius:4px;overflow:hidden;position:relative}
+.dual-bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:500;white-space:nowrap;min-width:2px;transition:width .4s ease}
+.dual-bar-num{font-size:12px;font-weight:500;color:#1a1a1a}
+.zh-color{background:#185FA5;color:#fff}
+.en-color{background:#1D9E75;color:#fff}
+.review-color{background:#7F77DD;color:#fff}
+.trans-color{background:#534AB7;color:#fff}
+.pending-color{background:#EF9F27;color:#fff}
+
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1.25rem}
+.filter-bar input,.filter-bar select{font-size:12px;padding:4px 10px;height:32px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;outline:none}
+.filter-bar input:focus,.filter-bar select:focus{border-color:#185FA5}
+.btn-sm{font-size:12px;padding:4px 12px;height:32px;border-radius:8px;cursor:pointer;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;transition:background .15s}
+.btn-sm:hover{background:#f1efe8}
+.btn-primary{background:#E6F1FB;border-color:#B5D4F4;color:#185FA5;font-weight:500}
+.btn-primary:hover{background:#B5D4F4}
+
+.tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid #e8e8e4;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+th{text-align:left;font-size:11px;font-weight:500;color:#888780;padding:10px 10px;border-bottom:1px solid #e8e8e4;white-space:nowrap;background:#fafaf8}
+td{padding:9px 10px;border-bottom:1px solid #f1efe8;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#1a1a1a}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+.sbadge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:500}
+.s0{background:#E6F1FB;color:#185FA5}
+.s1{background:#EEEDFE;color:#3C3489}
+.s2{background:#FAEEDA;color:#854F0B}
+.s3{background:#EAF3DE;color:#0F6E56}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;border:1px solid #e8e8e4;padding:1.5rem;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
+.modal h3{font-size:15px;font-weight:500;margin-bottom:1rem;color:#1a1a1a}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;color:#888780;margin-bottom:4px}
+.field input,.field select{width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;outline:none}
+.field input:focus,.field select:focus{border-color:#185FA5}
+.cb-row{display:flex;gap:16px}
+.cb-wrap{display:flex;align-items:center;gap:5px;font-size:12px;color:#888780;cursor:pointer}
+.cb-wrap input{accent-color:#185FA5;cursor:pointer;width:14px;height:14px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.btn-save{background:#E6F1FB;border:1px solid #B5D4F4;color:#185FA5;font-size:13px;padding:7px 18px;border-radius:8px;cursor:pointer;font-weight:500}
+.btn-save:hover{background:#B5D4F4}
+.btn-cancel{background:#fff;border:1px solid #d3d1c7;color:#888780;font-size:13px;padding:7px 18px;border-radius:8px;cursor:pointer}
+.btn-cancel:hover{background:#f1efe8}
+.watermark{font-size:10px;color:#b4b2a9;text-align:right;margin-top:1.5rem}
+
+@media(max-width:600px){
+  .mcard-grid{grid-template-columns:1fr 1fr}
+  .progress-row{grid-template-columns:48px 1fr 100px 44px}
+  .dual-bar-row{grid-template-columns:80px 1fr 32px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>文章進度控管儀表板</h1>
+    <p id="date-label"></p>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('exec',this)">長官報告版</button>
+    <button class="tab" onclick="switchTab('mgr',this)">主管報告版</button>
+    <button class="tab" onclick="switchTab('ops',this)">後台編輯版</button>
+  </div>
+
+  <div id="view-exec" class="view active"></div>
+  <div id="view-mgr" class="view"></div>
+  <div id="view-ops" class="view"></div>
+
+  <div class="modal-overlay" id="ops-modal">
+    <div class="modal">
+      <h3 id="modal-title">新增文章</h3>
+      <div class="field"><label>標題</label><input id="m-title" placeholder="文章標題"></div>
+      <div class="field"><label>狀態</label>
+        <select id="m-status"><option>審稿/校稿</option><option>翻譯中</option><option>待上架</option><option>已上架</option></select>
+      </div>
+      <div class="field"><label>季度</label>
+        <select id="m-q"><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select>
+      </div>
+      <div class="field"><label>中文預計上架日</label><input type="date" id="m-date-zh"></div>
+      <div class="field"><label>英文預計上架日</label><input type="date" id="m-date-en"></div>
+      <div class="field"><label>已上架確認</label>
+        <div class="cb-row">
+          <label class="cb-wrap"><input type="checkbox" id="m-live-zh"> 中文已上架</label>
+          <label class="cb-wrap"><input type="checkbox" id="m-live-en"> 英文已上架</label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">取消</button>
+        <button class="btn-save" onclick="saveArticle()">儲存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const KPI={zh:{Q1:20,Q2:60,Q3:60,Q4:60},en:{Q1:20,Q2:80,Q3:80,Q4:80}};
+const QS=['Q1','Q2','Q3','Q4'];
+const MONTH_LABELS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+document.getElementById('date-label').textContent='截至 '+new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
+
+let articles=[
+  {id:1,title:'生成式AI如何改變醫療產業',status:'已上架',q:'Q1',dateZh:'2026-01-15',dateEn:'2026-01-25',liveZh:true,liveEn:true},
+  {id:2,title:'2026年台灣新創生態觀察',status:'已上架',q:'Q1',dateZh:'2026-02-10',dateEn:'2026-03-05',liveZh:true,liveEn:true},
+  {id:3,title:'碳中和目標下的企業策略',status:'已上架',q:'Q1',dateZh:'2026-02-20',dateEn:'',liveZh:true,liveEn:false},
+  {id:4,title:'量子運算的商業應用前景',status:'審稿/校稿',q:'Q2',dateZh:'2026-04-10',dateEn:'2026-04-25',liveZh:false,liveEn:false},
+  {id:5,title:'東南亞電商市場深度分析',status:'待上架',q:'Q1',dateZh:'2026-03-25',dateEn:'',liveZh:false,liveEn:false},
+  {id:6,title:'數位金融監管新趨勢',status:'翻譯中',q:'Q1',dateZh:'2026-03-20',dateEn:'2026-04-15',liveZh:true,liveEn:false},
+  {id:7,title:'Web3與創作者經濟',status:'待上架',q:'Q2',dateZh:'2026-05-01',dateEn:'',liveZh:false,liveEn:false},
+  {id:8,title:'全球供應鏈重組趨勢',status:'審稿/校稿',q:'Q2',dateZh:'2026-05-15',dateEn:'2026-05-28',liveZh:false,liveEn:false},
+  {id:9,title:'元宇宙商業模式探索',status:'已上架',q:'Q1',dateZh:'2026-03-01',dateEn:'2026-03-15',liveZh:true,liveEn:true},
+  {id:10,title:'ESG投資新框架',status:'已上架',q:'Q1',dateZh:'2026-03-10',dateEn:'2026-03-22',liveZh:true,liveEn:true},
+];
+
+let execChart=null,mgrChart=null,editingId=null;
+
+function getStats(){
+  const lzQ={},leQ={},fzQ={},feQ={};
+  QS.forEach(q=>{lzQ[q]=0;leQ[q]=0;fzQ[q]=0;feQ[q]=0});
+  articles.forEach(a=>{
+    if(a.liveZh)lzQ[a.q]++;
+    if(a.liveEn)leQ[a.q]++;
+    if(a.dateZh||a.liveZh)fzQ[a.q]++;
+    if(a.dateEn||a.liveEn)feQ[a.q]++;
+  });
+  return{lzQ,leQ,fzQ,feQ};
+}
+function pct(a,t){return t>0?Math.round(a/t*100):0}
+function pill(p){const c=p>=100?'pct-ok':p>=60?'pct-warn':'pct-danger';return`<span class="pct-pill ${c}">${p}%</span>`}
+
+function kpiBlock(lang,stats,elId){
+  const isZh=lang==='zh';
+  const liveByQ=isZh?stats.lzQ:stats.leQ;
+  const fcByQ=isZh?stats.fzQ:stats.feQ;
+  const totalT=Object.values(KPI[lang]).reduce((a,b)=>a+b,0);
+  const totalL=Object.values(liveByQ).reduce((a,b)=>a+b,0);
+  const totalF=Object.values(fcByQ).reduce((a,b)=>a+b,0);
+  const color=isZh?'#185FA5':'#1D9E75';
+  const colorLight=isZh?'#B5D4F4':'#9FE1CB';
+  const rows=QS.map(q=>{
+    const t=KPI[lang][q],l=liveByQ[q]||0,f=fcByQ[q]||0;
+    const lp=Math.min(100,pct(l,t)),fp=Math.min(100,pct(f,t));
+    return`<div class="progress-row">
+      <span class="p-label">${q} 目標 ${t}</span>
+      <div class="p-track">
+        <div class="p-forecast" style="width:${fp}%;background:${colorLight}"></div>
+        <div class="p-actual" style="width:${lp}%;background:${color}"></div>
+      </div>
+      <div class="p-nums">已上架 <strong>${l}</strong>，預計達 <strong>${f}</strong></div>
+      ${pill(pct(l,t))}
+    </div>`;
+  }).join('');
+  document.getElementById(elId).innerHTML=`
+    <div class="kpi-header">
+      <span class="kpi-title">${isZh?'中文稿':'英文稿'} 全年 KPI</span>
+      <span class="kpi-meta">目標 ${totalT} 篇｜已上架 ${totalL}，預計可達 ${totalF}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:#f5f5f3;border-radius:8px;padding:.75rem;text-align:center">
+        <div style="font-size:10px;color:#888780;margin-bottom:4px">全年目標</div>
+        <div style="font-size:22px;font-weight:500;color:#1a1a1a">${totalT}</div>
+      </div>
+      <div style="background:#f5f5f3;border-radius:8px;padding:.75rem;text-align:center">
+        <div style="font-size:10px;color:#888780;margin-bottom:4px">已上架</div>
+        <div style="font-size:22px;font-weight:500;color:${color}">${totalL}</div>
+        <div style="font-size:10px;color:#b4b2a9">${pct(totalL,totalT)}% 達成</div>
+      </div>
+      <div style="background:#f5f5f3;border-radius:8px;padding:.75rem;text-align:center">
+        <div style="font-size:10px;color:#888780;margin-bottom:4px">預計可達</div>
+        <div style="font-size:22px;font-weight:500;color:#1a1a1a">${totalF}</div>
+        <div style="font-size:10px;color:#b4b2a9">${pct(totalF,totalT)}% 預估</div>
+      </div>
+    </div>
+    ${rows}
+    <div class="legend-row">
+      <span><span class="ld" style="background:${color}"></span>已上架</span>
+      <span><span class="ld" style="background:${colorLight}"></span>預計達成（含排程中）</span>
+    </div>`;
+}
+
+function buildCumulativeData(lang){
+  const liveByMonth=Array(12).fill(0);
+  articles.forEach(a=>{
+    const dateStr=lang==='zh'?a.dateZh:a.dateEn;
+    const isLive=lang==='zh'?a.liveZh:a.liveEn;
+    if(isLive&&dateStr){const m=new Date(dateStr).getMonth();liveByMonth[m]++;}
+  });
+  const cumActual=[];let s=0;
+  liveByMonth.forEach(v=>{s+=v;cumActual.push(s)});
+  const kpiVals=Object.values(KPI[lang]);
+  const cumTarget=[];let ts=0;
+  kpiVals.forEach(v=>{const pm=v/3;[0,1,2].forEach(()=>{ts+=pm;cumTarget.push(Math.round(ts));});});
+  return{cumActual,cumTarget};
+}
+
+function renderExec(){
+  const stats=getStats();
+  const totalLZh=Object.values(stats.lzQ).reduce((a,b)=>a+b,0);
+  const totalLEn=Object.values(stats.leQ).reduce((a,b)=>a+b,0);
+  const totalTZh=Object.values(KPI.zh).reduce((a,b)=>a+b,0);
+  const totalTEn=Object.values(KPI.en).reduce((a,b)=>a+b,0);
+  const pZh=pct(totalLZh,totalTZh),pEn=pct(totalLEn,totalTEn);
+  const dZh=buildCumulativeData('zh'),dEn=buildCumulativeData('en');
+  document.getElementById('view-exec').innerHTML=`
+    <div class="mcard-grid">
+      <div class="mcard"><div class="mcard-label">中文全年目標</div><div class="mcard-val">${totalTZh}</div><div class="mcard-sub">篇</div></div>
+      <div class="mcard ${pZh>=80?'ok':pZh>=50?'warn':'danger'}"><div class="mcard-label">中文已上架</div><div class="mcard-val">${totalLZh}</div><div class="mcard-sub">${pZh}% 已達成</div></div>
+      <div class="mcard"><div class="mcard-label">英文全年目標</div><div class="mcard-val">${totalTEn}</div><div class="mcard-sub">篇</div></div>
+      <div class="mcard ${pEn>=80?'ok':pEn>=50?'warn':'danger'}"><div class="mcard-label">英文已上架</div><div class="mcard-val">${totalLEn}</div><div class="mcard-sub">${pEn}% 已達成</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="kpi-block" id="exec-kpi-zh"></div>
+      <div class="kpi-block" id="exec-kpi-en"></div>
+    </div>
+    <div class="kpi-block">
+      <div class="kpi-header">
+        <span class="kpi-title">全年累積上架進度</span>
+        <span class="kpi-meta">實際累積 vs 目標進度線（依月均攤）</span>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#888780;margin-bottom:10px">
+        <span><span class="ld" style="background:#185FA5"></span>中文實際累積</span>
+        <span><span class="ld" style="background:#1D9E75"></span>英文實際累積</span>
+        <span><span class="ld" style="background:#D3D1C7"></span>中文目標進度</span>
+        <span><span class="ld" style="background:#9FE1CB"></span>英文目標進度</span>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="exec-chart"></canvas></div>
+    </div>
+    <div class="watermark">截至 ${new Date().toLocaleDateString('zh-TW')} · 數據每週更新</div>`;
+  kpiBlock('zh',stats,'exec-kpi-zh');
+  kpiBlock('en',stats,'exec-kpi-en');
+  if(execChart)execChart.destroy();
+  execChart=new Chart(document.getElementById('exec-chart').getContext('2d'),{
+    type:'line',
+    data:{labels:MONTH_LABELS,datasets:[
+      {label:'中文目標',data:dZh.cumTarget,borderColor:'#B4B2A9',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+      {label:'英文目標',data:dEn.cumTarget,borderColor:'#9FE1CB',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+      {label:'中文累積',data:dZh.cumActual,borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,0.07)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#185FA5',fill:true,tension:0.3},
+      {label:'英文累積',data:dEn.cumActual,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.07)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#1D9E75',fill:true,tension:0.3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#888780',font:{size:11}}},
+        y:{grid:{color:'rgba(136,135,128,0.12)'},ticks:{color:'#888780',font:{size:11},stepSize:20},min:0}
+      }}
+  });
+}
+
+function renderMgr(){
+  const stats=getStats();
+  const today=new Date();today.setHours(0,0,0,0);
+  const totalLZh=Object.values(stats.lzQ).reduce((a,b)=>a+b,0);
+  const totalLEn=Object.values(stats.leQ).reduce((a,b)=>a+b,0);
+  const totalTZh=Object.values(KPI.zh).reduce((a,b)=>a+b,0);
+  const totalTEn=Object.values(KPI.en).reduce((a,b)=>a+b,0);
+  const zhReview=articles.filter(a=>a.status==='審稿/校稿').length;
+  const zhPending=articles.filter(a=>a.status==='待上架').length;
+  const enTrans=articles.filter(a=>a.status==='翻譯中').length;
+  const enPending=articles.filter(a=>a.status==='待上架'&&a.dateEn).length;
+  const overdue=articles.filter(a=>!a.liveZh&&a.dateZh&&new Date(a.dateZh)<today).length;
+  const stuck=articles.filter(a=>a.status==='翻譯中'&&a.dateZh&&(today-new Date(a.dateZh))/86400000>7).length;
+  const maxVal=Math.max(zhReview,zhPending,totalLZh,enTrans,enPending,totalLEn,1);
+
+  function bar(count,colorClass,label){
+    const w=Math.round(count/maxVal*100);
+    return`<div class="dual-bar-row">
+      <div class="dual-bar-label">${label}</div>
+      <div class="dual-bar-track">
+        <div class="dual-bar-fill ${colorClass}" style="width:${w}%">${count>0?count+' 篇':''}</div>
+      </div>
+      <div class="dual-bar-num">${count}</div>
+    </div>`;
+  }
+
+  const alertsHtml=
+    (overdue>0?`<div class="alert-strip danger"><div><div class="a-title">逾期未上架</div><div class="a-detail">已超過預計上架日，請確認進度</div></div><div class="a-count">${overdue} 篇</div></div>`:'')+
+    (stuck>0?`<div class="alert-strip warn"><div><div class="a-title">翻譯卡關</div><div class="a-detail">翻譯中超過 7 天未推進</div></div><div class="a-count">${stuck} 篇</div></div>`:'');
+
+  document.getElementById('view-mgr').innerHTML=`
+    <div class="pipeline-wrap">
+      <div class="pipeline-title">中英文章流程進度對比</div>
+      <div class="pipeline-sub">中文主線（上）與英文並行支線（下）各階段篇數，以最大值為基準對齊</div>
+      <div style="font-size:11px;font-weight:500;color:#185FA5;margin-bottom:8px">中文主線</div>
+      ${bar(zhReview,'review-color','審稿/校稿')}
+      ${bar(zhPending,'pending-color','待上架')}
+      ${bar(totalLZh,'zh-color','已上架(中)')}
+      <div class="pipe-divider">
+        <div class="pipe-divider-line"></div>
+        <div class="pipe-divider-label">英文並行支線</div>
+        <div class="pipe-divider-line"></div>
+      </div>
+      <div style="font-size:11px;font-weight:500;color:#1D9E75;margin-bottom:8px">英文支線</div>
+      ${bar(enTrans,'trans-color','翻譯中')}
+      ${bar(enPending,'pending-color','待上架(英)')}
+      ${bar(totalLEn,'en-color','已上架(英)')}
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#888780;margin-top:12px;padding-top:10px;border-top:1px solid #e8e8e4">
+        <span><span class="ld" style="background:#7F77DD"></span>審稿/校稿</span>
+        <span><span class="ld" style="background:#534AB7"></span>翻譯中</span>
+        <span><span class="ld" style="background:#EF9F27"></span>待上架</span>
+        <span><span class="ld" style="background:#185FA5"></span>已上架(中)</span>
+        <span><span class="ld" style="background:#1D9E75"></span>已上架(英)</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div class="kpi-block" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:13px;font-weight:500">上架成果與警示</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:#f5f5f3;border-radius:8px;padding:.875rem;text-align:center">
+            <div style="font-size:10px;color:#888780;margin-bottom:4px">中文已上架</div>
+            <div style="font-size:26px;font-weight:500;color:#185FA5">${totalLZh}</div>
+            <div style="font-size:10px;color:#b4b2a9">目標 ${totalTZh} 篇</div>
+          </div>
+          <div style="background:#f5f5f3;border-radius:8px;padding:.875rem;text-align:center">
+            <div style="font-size:10px;color:#888780;margin-bottom:4px">英文已上架</div>
+            <div style="font-size:26px;font-weight:500;color:#1D9E75">${totalLEn}</div>
+            <div style="font-size:10px;color:#b4b2a9">目標 ${totalTEn} 篇</div>
+          </div>
+        </div>
+        ${alertsHtml||'<div style="font-size:12px;color:#b4b2a9;padding:8px 0;text-align:center">目前無異常警示</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="kpi-block" id="mgr-kpi-zh"></div>
+        <div class="kpi-block" id="mgr-kpi-en"></div>
+      </div>
+    </div>
+    <div class="kpi-block">
+      <div class="kpi-header">
+        <span class="kpi-title">各季文章狀態分布</span>
+        <span class="kpi-meta">依季度顯示各流程階段篇數堆疊</span>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#888780;margin-bottom:10px">
+        <span><span class="ld" style="background:#185FA5"></span>中文已上架</span>
+        <span><span class="ld" style="background:#1D9E75"></span>英文已上架</span>
+        <span><span class="ld" style="background:#EF9F27"></span>翻譯中/待上架</span>
+        <span><span class="ld" style="background:#7F77DD"></span>審稿中</span>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="mgr-chart"></canvas></div>
+    </div>`;
+
+  kpiBlock('zh',stats,'mgr-kpi-zh');
+  kpiBlock('en',stats,'mgr-kpi-en');
+  if(mgrChart)mgrChart.destroy();
+  mgrChart=new Chart(document.getElementById('mgr-chart').getContext('2d'),{
+    type:'bar',
+    data:{labels:QS,datasets:[
+      {label:'中文已上架',data:QS.map(q=>stats.lzQ[q]||0),backgroundColor:'#185FA5'},
+      {label:'英文已上架',data:QS.map(q=>stats.leQ[q]||0),backgroundColor:'#1D9E75'},
+      {label:'翻譯/待上架',data:QS.map(q=>articles.filter(a=>a.q===q&&(a.status==='翻譯中'||a.status==='待上架')).length),backgroundColor:'#EF9F27'},
+      {label:'審稿中',data:QS.map(q=>articles.filter(a=>a.q===q&&a.status==='審稿/校稿').length),backgroundColor:'#7F77DD'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+      scales:{
+        x:{stacked:true,grid:{display:false},ticks:{color:'#888780',font:{size:11}}},
+        y:{stacked:true,grid:{color:'rgba(136,135,128,0.12)'},ticks:{color:'#888780',font:{size:11},stepSize:5}}
+      }}
+  });
+}
+
+function buildOpsView(){
+  document.getElementById('view-ops').innerHTML=`
+    <div class="filter-bar">
+      <input type="text" id="ops-search" placeholder="搜尋標題…" style="width:160px" oninput="renderOps()">
+      <select id="ops-status" onchange="renderOps()">
+        <option value="">全部狀態</option>
+        <option>審稿/校稿</option><option>翻譯中</option><option>待上架</option><option>已上架</option>
+      </select>
+      <select id="ops-q" onchange="renderOps()">
+        <option value="">全部季度</option>
+        <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+      </select>
+      <button class="btn-sm" onclick="exportCSV()">匯出 CSV</button>
+      <button class="btn-sm btn-primary" onclick="openModal(null)">+ 新增文章</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:30%">標題</th>
+          <th style="width:13%">狀態</th>
+          <th style="width:7%">季度</th>
+          <th style="width:13%">中文上架日</th>
+          <th style="width:13%">英文上架日</th>
+          <th style="width:9%;text-align:center">中文已上架</th>
+          <th style="width:9%;text-align:center">英文已上架</th>
+          <th style="width:6%"></th>
+        </tr></thead>
+        <tbody id="ops-tbody"></tbody>
+      </table>
+    </div>`;
+  renderOps();
+}
+
+function renderOps(){
+  const q=(document.getElementById('ops-search')||{}).value||'';
+  const st=(document.getElementById('ops-status')||{}).value||'';
+  const qt=(document.getElementById('ops-q')||{}).value||'';
+  const smap={'審稿/校稿':'s0','翻譯中':'s1','待上架':'s2','已上架':'s3'};
+  const filtered=articles.filter(a=>{
+    if(q&&!a.title.toLowerCase().includes(q.toLowerCase()))return false;
+    if(st&&a.status!==st)return false;
+    if(qt&&a.q!==qt)return false;
+    return true;
+  });
+  document.getElementById('ops-tbody').innerHTML=filtered.map(a=>`
+    <tr>
+      <td title="${a.title}">${a.title}</td>
+      <td><span class="sbadge ${smap[a.status]||''}">${a.status}</span></td>
+      <td style="color:#888780">${a.q}</td>
+      <td style="color:#888780">${a.dateZh||'—'}</td>
+      <td style="color:#888780">${a.dateEn||'—'}</td>
+      <td style="text-align:center">${a.liveZh?'<span style="color:#0F6E56;font-weight:500">✓</span>':'<span style="color:#d3d1c7">—</span>'}</td>
+      <td style="text-align:center">${a.liveEn?'<span style="color:#0F6E56;font-weight:500">✓</span>':'<span style="color:#d3d1c7">—</span>'}</td>
+      <td><button style="font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;border:1px solid #d3d1c7;background:#fff;color:#888780" onclick="openModal(${a.id})">編輯</button></td>
+    </tr>`).join('');
+}
+
+function switchTab(t,el){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('view-'+t).classList.add('active');
+  if(t==='exec')renderExec();
+  else if(t==='mgr')renderMgr();
+  else buildOpsView();
+}
+
+function openModal(id){
+  editingId=id;
+  const m=id?articles.find(a=>a.id===id):null;
+  document.getElementById('modal-title').textContent=id?'編輯文章':'新增文章';
+  document.getElementById('m-title').value=m?m.title:'';
+  document.getElementById('m-status').value=m?m.status:'審稿/校稿';
+  document.getElementById('m-q').value=m?m.q:'Q1';
+  document.getElementById('m-date-zh').value=m?m.dateZh:'';
+  document.getElementById('m-date-en').value=m?m.dateEn:'';
+  document.getElementById('m-live-zh').checked=m?m.liveZh:false;
+  document.getElementById('m-live-en').checked=m?m.liveEn:false;
+  document.getElementById('ops-modal').classList.add('open');
+}
+function closeModal(){document.getElementById('ops-modal').classList.remove('open')}
+function saveArticle(){
+  const title=document.getElementById('m-title').value.trim();
+  if(!title)return;
+  const data={title,status:document.getElementById('m-status').value,q:document.getElementById('m-q').value,
+    dateZh:document.getElementById('m-date-zh').value,dateEn:document.getElementById('m-date-en').value,
+    liveZh:document.getElementById('m-live-zh').checked,liveEn:document.getElementById('m-live-en').checked};
+  if(editingId){const i=articles.findIndex(a=>a.id===editingId);articles[i]={...articles[i],...data};}
+  else articles.push({id:Date.now(),...data});
+  closeModal();renderOps();
+}
+function exportCSV(){
+  const rows=[['標題','狀態','季度','中文上架日','英文上架日','中文已上架','英文已上架']];
+  articles.forEach(a=>rows.push([a.title,a.status,a.q,a.dateZh,a.dateEn,a.liveZh?'是':'否',a.liveEn?'是':'否']));
+  const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='articles.csv';a.click();
+}
+renderExec();
+</script>
+</body>
+</html>
