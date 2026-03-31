@@ -1,0 +1,37 @@
+{
+  "updated": "2026-03-31 10:43",
+  "years": [
+    "2024"
+  ],
+  "data": {
+    "2024": {
+      "stats": {
+        "year": "2024",
+        "total": 60,
+        "total_all": 60,
+        "liveZh": 60,
+        "liveEn": 60,
+        "targetZh": 70,
+        "targetEn": 70,
+        "pctZh": 86,
+        "pctEn": 86,
+        "gap": 0,
+        "review": 0,
+        "trans": 0,
+        "pending": 0,
+        "bothLive": 60,
+        "zhOnlyLive": 0,
+        "overdue": [],
+        "stuck": [],
+        "qDetails": [
+          "Q1：中文 60/10（600%），英文 60/10（600%）",
+          "Q2：中文 0/20（0%），英文 0/20（0%）",
+          "Q3：中文 0/20（0%），英文 0/20（0%）",
+          "Q4：中文 0/20（0%），英文 0/20（0%）"
+        ]
+      },
+      "highlights": [],
+      "qa_pairs": []
+    }
+  }
+}
