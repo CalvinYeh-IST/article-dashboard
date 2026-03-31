@@ -727,6 +727,9 @@ function askContentAI(btn) {
   runContentAI();
 }
 
+const AI_CACHE = new Map();
+const AI_CACHE_LIMIT = 30;
+
 async function runContentAI() {
   const input = document.getElementById('search-ai-q');
   const btn   = document.getElementById('search-ai-btn');
@@ -735,9 +738,17 @@ async function runContentAI() {
   const q = input.value.trim();
   if (!q) return;
 
-  btn.disabled    = true;
+  btn.disabled      = true;
   res.style.display = 'block';
-  res.textContent   = 'AI 比對資料庫中…';
+
+  const cacheKey = q + '|' + currentYear;
+  if (AI_CACHE.has(cacheKey)) {
+    res.innerHTML = AI_CACHE.get(cacheKey);
+    btn.disabled  = false;
+    return;
+  }
+
+  res.textContent = 'AI 比對資料庫中…';
 
   const context = contentArticles.map(a =>
     `- 《${a.title}》｜${a.city}${a.area}｜主題:${a.theme.join('+')}｜地方:${a.region.join('+')}｜時令:${a.season.join('+')}｜`+
@@ -748,22 +759,27 @@ async function runContentAI() {
     (a.hasEvent  ? `活動(${a.eventKw}) ` : '')
   ).join('\n');
 
-  const GEMINI_KEY = window.__GEMINI_KEY__ || '';
+  const GEMINI_KEY = window.__GEMINI_KEY__ || localStorage.getItem('gemini_key') || '';
   if (!GEMINI_KEY) {
-    res.textContent = '請在 main.js 中設定 window.__GEMINI_KEY__';
+    res.textContent = '尚未設定 Gemini API Key，請點右上角齒輪圖示設定';
     btn.disabled = false;
     return;
   }
 
   try {
-    const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
+    const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
     const body = JSON.stringify({contents:[{parts:[{text:
       `你是內容資料庫助理。根據以下 ${contentArticles.length} 篇文章清單，用繁體中文精確回答問題。列出相關文章時請顯示標題與關鍵資訊，格式清晰，若無符合文章請直接說明。\n\n【文章資料庫】\n${context}\n\n【問題】${q}`
     }]}]});
     const resp   = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body});
     const data   = await resp.json();
     const answer = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回答';
-    res.innerHTML = answer.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+    const formatted = answer.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+    res.innerHTML = formatted;
+    if (AI_CACHE.size >= AI_CACHE_LIMIT) {
+      AI_CACHE.delete(AI_CACHE.keys().next().value);
+    }
+    AI_CACHE.set(cacheKey, formatted);
   } catch(e) {
     res.textContent = '查詢失敗，請確認 Gemini API Key 設定正確。';
   }
