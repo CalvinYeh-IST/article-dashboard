@@ -175,16 +175,606 @@ const MONTH_LABELS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct',
 document.getElementById('date-label').textContent='截至 '+new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
 
 let articles=[
-  {id:1,title:'生成式AI如何改變醫療產業',status:'已上架',q:'Q1',dateZh:'2026-01-15',dateEn:'2026-01-25',liveZh:true,liveEn:true},
-  {id:2,title:'2026年台灣新創生態觀察',status:'已上架',q:'Q1',dateZh:'2026-02-10',dateEn:'2026-03-05',liveZh:true,liveEn:true},
-  {id:3,title:'碳中和目標下的企業策略',status:'已上架',q:'Q1',dateZh:'2026-02-20',dateEn:'',liveZh:true,liveEn:false},
-  {id:4,title:'量子運算的商業應用前景',status:'審稿/校稿',q:'Q2',dateZh:'2026-04-10',dateEn:'2026-04-25',liveZh:false,liveEn:false},
-  {id:5,title:'東南亞電商市場深度分析',status:'待上架',q:'Q1',dateZh:'2026-03-25',dateEn:'',liveZh:false,liveEn:false},
-  {id:6,title:'數位金融監管新趨勢',status:'翻譯中',q:'Q1',dateZh:'2026-03-20',dateEn:'2026-04-15',liveZh:true,liveEn:false},
-  {id:7,title:'Web3與創作者經濟',status:'待上架',q:'Q2',dateZh:'2026-05-01',dateEn:'',liveZh:false,liveEn:false},
-  {id:8,title:'全球供應鏈重組趨勢',status:'審稿/校稿',q:'Q2',dateZh:'2026-05-15',dateEn:'2026-05-28',liveZh:false,liveEn:false},
-  {id:9,title:'元宇宙商業模式探索',status:'已上架',q:'Q1',dateZh:'2026-03-01',dateEn:'2026-03-15',liveZh:true,liveEn:true},
-  {id:10,title:'ESG投資新框架',status:'已上架',q:'Q1',dateZh:'2026-03-10',dateEn:'2026-03-22',liveZh:true,liveEn:true},
+  {
+    "id": 1,
+    "title": "小米─本是原住民主要糧食，在台超過5000年",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 2,
+    "title": "小麥─第二大糧食穀物，自給率千分之三",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 3,
+    "title": "地瓜─「番薯仔」一詞象徵台灣韌性",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 4,
+    "title": "芋頭─我正式名字叫「芋艿」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 5,
+    "title": "紅豆─紅豆生南國，多元甜蜜食",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 6,
+    "title": "黃豆─田裡的肉，外銷日本的「綠金」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 7,
+    "title": "綠豆─品種上千，你吃過幾種",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 8,
+    "title": "落花生─象徵發財、吉祥、多子多孫",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 9,
+    "title": "紅藜─超級食物台灣原生版",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 10,
+    "title": "小白菜─是大白菜的「祖先」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 11,
+    "title": "高麗菜─天菜隊長名為「初秋」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 12,
+    "title": "金針花─觀為花、食為菜、用為藥",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 13,
+    "title": "絲瓜─《本草綱目》：「其瓤有絡」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 14,
+    "title": "山葵─阿里山上的台灣綠金傳奇",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 15,
+    "title": "白蘿蔔─吉祥蔬菜，語意：好彩頭",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 16,
+    "title": "空心菜─暗示「有心招待，無心留客」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 17,
+    "title": "山苦瓜─從山產店熱炒到生技新星",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 18,
+    "title": "山蘇─台灣蕨類王國中的熱門菜",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 19,
+    "title": "茭白筍─俗稱美人腿，其實是生了病",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 20,
+    "title": "綠竹筍─初夏綠寶石 多汁、清甜",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 21,
+    "title": "苦瓜─又名半生瓜，50歲後才懂它的好",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 22,
+    "title": "愛玉─台灣獨有，米其林指南也讚嘆",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 23,
+    "title": "洋蔥─不靠顏值，台灣洋蔥憑口味實力外銷",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 24,
+    "title": "大蒜─不可一日沒有它",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 25,
+    "title": "薑─嫩薑用於做菜，老薑用於養身",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 26,
+    "title": "蔥─1米高的蔥，展現台灣農民實力",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 27,
+    "title": "九層塔─特殊地方種，台味十足",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 28,
+    "title": "番茄─2014年起外銷多國市場",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 29,
+    "title": "柑橘─全世界、台灣都是產量最大水果",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 30,
+    "title": "木瓜─米其林必嘗台灣美味：木瓜牛奶",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 31,
+    "title": "香蕉─MIT香蕉，進駐東京奧運選手村",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 32,
+    "title": "鳳梨─台灣鳳梨品種，世界第一",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 33,
+    "title": "蓮霧─水果王國中的勞斯萊斯",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 34,
+    "title": "芭樂─國民水果，國宴、米其林都現蹤",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 35,
+    "title": "水梨─寶島甘露梨每顆破台幣千元",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 36,
+    "title": "楊桃─做成蜜餞加冰，是古早味",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 37,
+    "title": "葡萄─巨峰葡萄創造紫金傳奇",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 38,
+    "title": "梅子─青梅外銷轉內需，找到新生命力",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 39,
+    "title": "棗子─台灣研發品種顏值高、名字美",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 40,
+    "title": "紅棗─苗栗為主產地，鮮食、曬乾皆可",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 41,
+    "title": "荔枝─妃子笑與玉荷包",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 42,
+    "title": "龍眼─柴燒龍眼乾，助吳寶春在世界烘焙賽奪金",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 43,
+    "title": "芒果─品種超過20個，打造台灣芒果王國美譽",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 44,
+    "title": "百香果─叫我「熱情果」，真是誤會",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 45,
+    "title": "水蜜桃─嬌貴的極品水果，本地人獨享",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 46,
+    "title": "西瓜─康熙皇帝生日時的祝壽禮",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 47,
+    "title": "檸檬─台灣特有酸度，猶如「初戀的滋味」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 48,
+    "title": "酪梨─綽號「幸福果」，台灣版本更適合做酪梨牛奶",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 49,
+    "title": "麻豆文旦─古時候，是御用水果",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 50,
+    "title": "柿子─連泰國皇室也被圈粉",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 51,
+    "title": "釋迦─台灣釋迦果品品質，世界第一",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 52,
+    "title": "草莓─食用本體是花托、假果",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 53,
+    "title": "雞─本土／進口白肉雞各占一半",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 54,
+    "title": "豬─古字為豕，無豬「不成家」",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 55,
+    "title": "鴨─升級版的品牌鴨問市",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 56,
+    "title": "羊─本土羊市占率5％，新品種朝精緻化發展",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 57,
+    "title": "牛─堅毅台灣牛vs美味進口牛",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 58,
+    "title": "鵝─早期，養鵝是農家副業",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 59,
+    "title": "養殖蝦─曾是養殖蝦王國，目前展開2.0篇章",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  },
+  {
+    "id": 60,
+    "title": "文蛤（台灣文蛤）─台灣「國民海鮮」，療癒系料理",
+    "status": "已上架",
+    "q": "Q1",
+    "dateZh": "2026-01-15",
+    "dateEn": "2026-01-25",
+    "liveZh": true,
+    "liveEn": true
+  }
 ];
 
 let execChart=null,mgrChart=null,editingId=null;
