@@ -2,24 +2,41 @@ const QS = ['Q1','Q2','Q3','Q4'];
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 let articles = [];
-let config = {};
+let config   = {};
+let summary  = {};
+let contentArticles    = [];
+let contentSummary     = {};
+let activeThemes       = new Set();
+let activeRegions      = new Set();
+let activeSeasons      = new Set();
+let activeHas          = new Set();
 let currentYear = '';
-let currentTab = 'exec';
-let execChart = null;
-let mgrChart = null;
-let editingId = null;
-let qaHistory = [];
+let currentTab  = 'exec';
+let execChart   = null;
+let mgrChart    = null;
+let editingId   = null;
+
+const THEMES   = ['文化美食','自然生態','常民生活','藝術文化'];
+const REGIONS  = ['北部','中部','南部','東部','離島'];
+const SEASONS  = ['春','夏','秋','冬'];
+const HAS_OPTS = ['店家','小吃','伴手禮','景點','活動'];
 
 document.getElementById('date-label').textContent =
   '截至 ' + new Date().toLocaleDateString('zh-TW', {year:'numeric',month:'long',day:'numeric'});
 
 Promise.all([
   fetch('data.json').then(r => r.json()),
-  fetch('config.json').then(r => r.json())
-]).then(([data, cfg]) => {
-  articles = data;
-  config = cfg;
-  currentYear = cfg.years[cfg.years.length - 1];
+  fetch('config.json').then(r => r.json()),
+  fetch('summary.json').then(r => r.json()).catch(() => null),
+  fetch('content.json').then(r => r.json()).catch(() => []),
+  fetch('content_summary.json').then(r => r.json()).catch(() => null),
+]).then(([data, cfg, sum, content, contentSum]) => {
+  articles        = data;
+  config          = cfg;
+  summary         = sum || {};
+  contentArticles = content || [];
+  contentSummary  = contentSum || {};
+  currentYear     = cfg.years[cfg.years.length - 1];
   init();
 }).catch(err => {
   document.getElementById('app').innerHTML =
@@ -36,12 +53,14 @@ function init() {
       <button class="tab active" onclick="switchTab('exec',this)">長官報告版</button>
       <button class="tab" onclick="switchTab('mgr',this)">主管報告版</button>
       <button class="tab" onclick="switchTab('ops',this)">後台編輯版</button>
-      <button class="tab" onclick="switchTab('qa',this)">AI 數據問答</button>
+      <button class="tab" onclick="switchTab('qa',this)">AI 數據摘要</button>
+      <button class="tab" onclick="switchTab('search',this)">文章查詢</button>
     </div>
-    <div id="view-exec" class="view active"></div>
-    <div id="view-mgr" class="view"></div>
-    <div id="view-ops" class="view"></div>
-    <div id="view-qa" class="view"></div>
+    <div id="view-exec"   class="view active"></div>
+    <div id="view-mgr"    class="view"></div>
+    <div id="view-ops"    class="view"></div>
+    <div id="view-qa"     class="view"></div>
+    <div id="view-search" class="view"></div>
   `;
   buildYearTabs();
   renderExec();
@@ -85,22 +104,23 @@ function buildYearTabs() {
 function setYear(y) {
   currentYear = y;
   buildYearTabs();
-  if (currentTab==='exec') renderExec();
-  else if (currentTab==='mgr') renderMgr();
-  else if (currentTab==='ops') renderOps();
-  else if (currentTab==='qa') renderQA();
+  if      (currentTab==='exec') renderExec();
+  else if (currentTab==='mgr')  renderMgr();
+  else if (currentTab==='ops')  renderOps();
+  else if (currentTab==='qa')   renderQA();
 }
 
 function kpiBlock(lang, stats, elId) {
-  const kpi = config.kpi[currentYear][lang];
-  const isZh = lang === 'zh';
-  const liveByQ = isZh ? stats.lzQ : stats.leQ;
-  const fcByQ   = isZh ? stats.fzQ : stats.feQ;
-  const totalT  = Object.values(kpi).reduce((a,b)=>a+b,0);
-  const totalL  = Object.values(liveByQ).reduce((a,b)=>a+b,0);
-  const totalF  = Object.values(fcByQ).reduce((a,b)=>a+b,0);
+  const kpi        = config.kpi[currentYear][lang];
+  const isZh       = lang === 'zh';
+  const liveByQ    = isZh ? stats.lzQ : stats.leQ;
+  const fcByQ      = isZh ? stats.fzQ : stats.feQ;
+  const totalT     = Object.values(kpi).reduce((a,b)=>a+b,0);
+  const totalL     = Object.values(liveByQ).reduce((a,b)=>a+b,0);
+  const totalF     = Object.values(fcByQ).reduce((a,b)=>a+b,0);
   const color      = isZh ? '#185FA5' : '#1D9E75';
   const colorLight = isZh ? '#B5D4F4' : '#9FE1CB';
+
   const rows = QS.map(q => {
     const t=kpi[q], l=liveByQ[q]||0, f=fcByQ[q]||0;
     const lp=Math.min(100,pct(l,t)), fp=Math.min(100,pct(f,t));
@@ -114,6 +134,7 @@ function kpiBlock(lang, stats, elId) {
       ${pill(pct(l,t))}
     </div>`;
   }).join('');
+
   document.getElementById(elId).innerHTML = `
     <div class="kpi-header">
       <span class="kpi-title">${isZh?'中文稿':'英文稿'} ${currentYear} KPI</span>
@@ -150,17 +171,17 @@ function buildCumData(lang, arts) {
     const lv = lang==='zh' ? a.liveZh : a.liveEn;
     if (lv && ds) { const m = new Date(ds).getMonth(); if(m>=0&&m<12) lbm[m]++; }
   });
-  const cumA = []; let s = 0;
+  const cumA=[]; let s=0;
   lbm.forEach(v => { s+=v; cumA.push(s); });
-  const cumT = []; let ts = 0;
+  const cumT=[]; let ts=0;
   QS.forEach(q => { const pm=kpi[q]/3; [0,1,2].forEach(()=>{ ts+=pm; cumT.push(Math.round(ts)); }); });
   return {cumA, cumT};
 }
 
 function renderExec() {
-  const arts = filtered();
-  const stats = getStats(arts);
-  const kpi = config.kpi[currentYear];
+  const arts   = filtered();
+  const stats  = getStats(arts);
+  const kpi    = config.kpi[currentYear];
   const totalLZh = Object.values(stats.lzQ).reduce((a,b)=>a+b,0);
   const totalLEn = Object.values(stats.leQ).reduce((a,b)=>a+b,0);
   const totalTZh = Object.values(kpi.zh).reduce((a,b)=>a+b,0);
@@ -215,9 +236,9 @@ function renderExec() {
 }
 
 function renderMgr() {
-  const arts = filtered();
+  const arts  = filtered();
   const stats = getStats(arts);
-  const kpi = config.kpi[currentYear];
+  const kpi   = config.kpi[currentYear];
   const today = new Date(); today.setHours(0,0,0,0);
   const totalLZh = Object.values(stats.lzQ).reduce((a,b)=>a+b,0);
   const totalLEn = Object.values(stats.leQ).reduce((a,b)=>a+b,0);
@@ -228,7 +249,7 @@ function renderMgr() {
   const enT = arts.filter(a=>a.status==='翻譯中').length;
   const enP = arts.filter(a=>a.status==='待上架'&&a.dateEn).length;
   const overdue = arts.filter(a=>!a.liveZh&&a.dateZh&&new Date(a.dateZh)<today).length;
-  const stuck = arts.filter(a=>a.status==='翻譯中'&&a.dateZh&&(today-new Date(a.dateZh))/86400000>7).length;
+  const stuck   = arts.filter(a=>a.status==='翻譯中'&&a.dateZh&&(today-new Date(a.dateZh))/86400000>7).length;
   const maxV = Math.max(zhR,zhP,totalLZh,enT,enP,totalLEn,1);
 
   function bar(n,cls,label) {
@@ -300,10 +321,10 @@ function renderMgr() {
   mgrChart = new Chart(document.getElementById('mgr-chart').getContext('2d'), {
     type:'bar',
     data:{labels:QS, datasets:[
-      {label:'中文上架',  data:QS.map(q=>stats.lzQ[q]||0), backgroundColor:'#185FA5'},
-      {label:'英文上架',  data:QS.map(q=>stats.leQ[q]||0), backgroundColor:'#1D9E75'},
-      {label:'翻譯/待上架', data:QS.map(q=>arts.filter(a=>a.q===q&&(a.status==='翻譯中'||a.status==='待上架')).length), backgroundColor:'#EF9F27'},
-      {label:'審稿中',   data:QS.map(q=>arts.filter(a=>a.q===q&&a.status==='審稿/校稿').length), backgroundColor:'#7F77DD'},
+      {label:'中文上架',   data:QS.map(q=>stats.lzQ[q]||0), backgroundColor:'#185FA5'},
+      {label:'英文上架',   data:QS.map(q=>stats.leQ[q]||0), backgroundColor:'#1D9E75'},
+      {label:'翻譯/待上架',data:QS.map(q=>arts.filter(a=>a.q===q&&(a.status==='翻譯中'||a.status==='待上架')).length), backgroundColor:'#EF9F27'},
+      {label:'審稿中',     data:QS.map(q=>arts.filter(a=>a.q===q&&a.status==='審稿/校稿').length), backgroundColor:'#7F77DD'},
     ]},
     options:{responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}, tooltip:{mode:'index',intersect:false}},
@@ -376,108 +397,80 @@ function renderOps() {
     </tr>`).join('');
 }
 
-function buildDataSummary() {
-  const arts = filtered();
-  const kpi  = config.kpi[currentYear];
-  const stats = getStats(arts);
-  const totalLZh = Object.values(stats.lzQ).reduce((a,b)=>a+b,0);
-  const totalLEn = Object.values(stats.leQ).reduce((a,b)=>a+b,0);
-  const totalTZh = Object.values(kpi.zh).reduce((a,b)=>a+b,0);
-  const totalTEn = Object.values(kpi.en).reduce((a,b)=>a+b,0);
-  const qStats = QS.map(q => {
-    const tzh=kpi.zh[q], ten=kpi.en[q];
-    const lzh=stats.lzQ[q]||0, len=stats.leQ[q]||0;
-    return `${q}：中文 ${lzh}/${tzh}（${pct(lzh,tzh)}%），英文 ${len}/${ten}（${pct(len,ten)}%）`;
-  }).join('；');
-  return `
-【${currentYear}年度數據摘要】
-總庫存：${arts.length} 篇（所有年份合計：${articles.length} 篇）
-中文已上架：${totalLZh} 篇，目標 ${totalTZh} 篇，達成率 ${pct(totalLZh,totalTZh)}%
-英文已上架：${totalLEn} 篇，目標 ${totalTEn} 篇，達成率 ${pct(totalLEn,totalTEn)}%
-中英上架差距：${totalLZh - totalLEn} 篇（中文比英文多）
-各季進度：${qStats}
-審稿/校稿中：${arts.filter(a=>a.status==='審稿/校稿').length} 篇
-翻譯中：${arts.filter(a=>a.status==='翻譯中').length} 篇
-待上架：${arts.filter(a=>a.status==='待上架').length} 篇
-中英皆已上架：${arts.filter(a=>a.liveZh&&a.liveEn).length} 篇
-僅中文上架（英文未完成）：${arts.filter(a=>a.liveZh&&!a.liveEn).length} 篇
-  `.trim();
-}
-
 function renderQA() {
-  document.getElementById('view-qa').innerHTML = `
-    <div class="qa-wrap">
-      <div class="qa-title">AI 數據問答</div>
-      <div class="qa-sub">輸入任何關於 ${currentYear} 年度文章數據的問題，AI 即時分析回答</div>
-      <div class="qa-chips">
-        <button class="qa-chip" onclick="askQ('${currentYear}年總共上架了幾篇文章？')">${currentYear}年總共上架幾篇？</button>
-        <button class="qa-chip" onclick="askQ('目前資料庫總庫存幾篇？各階段分別幾篇？')">目前總庫存幾篇？</button>
-        <button class="qa-chip" onclick="askQ('中英文上架數量差幾篇？')">中英上架差距</button>
-        <button class="qa-chip" onclick="askQ('本季KPI達成進度如何？')">本季KPI進度</button>
-        <button class="qa-chip" onclick="askQ('各季度KPI達成百分比分別是多少？')">各季達成率</button>
-        <button class="qa-chip" onclick="askQ('目前有哪些文章逾期未上架？')">逾期文章</button>
-      </div>
-      <div class="qa-input-row">
-        <input class="qa-input" id="qa-input" placeholder="輸入問題，例如：2026年Q2上架了幾篇英文文章？" onkeydown="if(event.key==='Enter')sendQA()">
-        <button class="qa-send" id="qa-send-btn" onclick="sendQA()">送出</button>
-      </div>
-      <div class="qa-history" id="qa-history">
-        <div class="qa-empty">點選上方快速問題，或自行輸入</div>
-      </div>
-    </div>`;
-  renderQAHistory();
-}
+  const yearData = summary.data?.[currentYear];
+  const updated  = summary.updated || '尚未同步';
 
-function renderQAHistory() {
-  const el = document.getElementById('qa-history');
-  if (!el) return;
-  if (qaHistory.length === 0) {
-    el.innerHTML = '<div class="qa-empty">點選上方快速問題，或自行輸入</div>';
+  if (!yearData) {
+    document.getElementById('view-qa').innerHTML = `
+      <div class="qa-wrap">
+        <div class="qa-title">AI 數據摘要</div>
+        <div style="font-size:12px;color:#b4b2a9;padding:24px 0;text-align:center">
+          尚未產生 ${currentYear} 年度摘要，請執行一次 sync.py 後重新整理頁面。
+        </div>
+      </div>`;
     return;
   }
-  el.innerHTML = qaHistory.map(m =>
-    `<div class="qa-bubble-${m.role}">${m.content.replace(/\n/g,'<br>')}</div>`
-  ).join('');
-  el.scrollTop = el.scrollHeight;
+
+  const highlights = yearData.highlights || [];
+  const qaPairs    = yearData.qa_pairs   || [];
+  const stats      = yearData.stats      || {};
+
+  const highlightHtml = highlights.length > 0
+    ? highlights.map(h => `
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:0.5px solid #f1efe8">
+          <div style="width:6px;height:6px;border-radius:50%;background:#185FA5;flex-shrink:0;margin-top:5px"></div>
+          <div style="font-size:13px;color:#1a1a1a;line-height:1.6">${h}</div>
+        </div>`).join('')
+    : '<div style="font-size:12px;color:#b4b2a9;padding:12px 0">摘要產生中，請稍後再試</div>';
+
+  const qaHtml = qaPairs.length > 0
+    ? qaPairs.map((pair,i) => `
+        <div style="border:1px solid #e8e8e4;border-radius:8px;overflow:hidden;margin-bottom:8px">
+          <div style="background:#f5f5f3;padding:8px 12px;font-size:12px;font-weight:500;color:#1a1a1a;cursor:pointer"
+               onclick="toggleQA(${i})">
+            <span style="color:#185FA5;margin-right:6px">Q</span>${pair.q}
+          </div>
+          <div id="qa-ans-${i}" style="display:none;padding:10px 12px;font-size:12px;color:#1a1a1a;line-height:1.6;border-top:1px solid #f1efe8">
+            <span style="color:#1D9E75;font-weight:500;margin-right:6px">A</span>${pair.a}
+          </div>
+        </div>`).join('')
+    : '<div style="font-size:12px;color:#b4b2a9;padding:12px 0">問答產生中，請稍後再試</div>';
+
+  const overdueList = (stats.overdue||[]).slice(0,5);
+  const stuckList   = (stats.stuck||[]).slice(0,5);
+
+  document.getElementById('view-qa').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div class="qa-wrap">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="qa-title">${currentYear} 年度重點摘要</div>
+          <div style="font-size:10px;color:#b4b2a9">更新於 ${updated}</div>
+        </div>
+        ${highlightHtml}
+      </div>
+      <div class="qa-wrap">
+        <div class="qa-title" style="margin-bottom:14px">需注意項目</div>
+        ${overdueList.length>0?`
+          <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:6px">逾期未上架（${stats.overdue?.length||0} 篇）</div>
+          ${overdueList.map(t=>`<div style="font-size:11px;color:#1a1a1a;padding:4px 0;border-bottom:0.5px solid #f1efe8">${t}</div>`).join('')}
+        `:'<div style="font-size:12px;color:#b4b2a9;margin-bottom:12px">無逾期文章</div>'}
+        ${stuckList.length>0?`
+          <div style="font-size:11px;font-weight:500;color:#854F0B;margin-top:12px;margin-bottom:6px">翻譯卡關（${stats.stuck?.length||0} 篇）</div>
+          ${stuckList.map(t=>`<div style="font-size:11px;color:#1a1a1a;padding:4px 0;border-bottom:0.5px solid #f1efe8">${t}</div>`).join('')}
+        `:'<div style="font-size:12px;color:#b4b2a9;margin-top:12px">無翻譯卡關</div>'}
+      </div>
+    </div>
+    <div class="qa-wrap">
+      <div class="qa-title" style="margin-bottom:4px">常見問答</div>
+      <div style="font-size:11px;color:#888780;margin-bottom:14px">點選問題展開答案 · 由 AI 根據最新數據自動產生</div>
+      ${qaHtml}
+    </div>`;
 }
 
-function askQ(q) {
-  const input = document.getElementById('qa-input');
-  if (input) input.value = q;
-  sendQA();
-}
-
-async function sendQA() {
-  const input = document.getElementById('qa-input');
-  const btn   = document.getElementById('qa-send-btn');
-  if (!input || !btn) return;
-  const q = input.value.trim();
-  if (!q) return;
-  input.value = '';
-  btn.disabled = true;
-  qaHistory.push({role:'user', content:q});
-  qaHistory.push({role:'ai',  content:'分析數據中…'});
-  renderQAHistory();
-  const summary = buildDataSummary();
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        system:`你是一位專業的內容營運數據分析助理。根據以下數據摘要，用繁體中文簡潔回答主管的問題。回答要直接、數字精確、條列清晰，不要有多餘的客套話。\n\n${summary}`,
-        messages:[{role:'user', content:q}]
-      })
-    });
-    const data = await res.json();
-    const answer = data.content?.map(c=>c.text||'').join('') || '無法取得回答，請稍後再試。';
-    qaHistory[qaHistory.length-1] = {role:'ai', content:answer};
-  } catch(e) {
-    qaHistory[qaHistory.length-1] = {role:'ai', content:'發生錯誤，請確認網路連線後再試。'};
-  }
-  renderQAHistory();
-  btn.disabled = false;
+function toggleQA(i) {
+  const el = document.getElementById(`qa-ans-${i}`);
+  if (el) el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
 function switchTab(t, el) {
@@ -486,10 +479,11 @@ function switchTab(t, el) {
   el.classList.add('active');
   document.getElementById('view-'+t).classList.add('active');
   currentTab = t;
-  if      (t==='exec') renderExec();
-  else if (t==='mgr')  renderMgr();
-  else if (t==='ops')  renderOps();
-  else if (t==='qa')   renderQA();
+  if      (t==='exec')   renderExec();
+  else if (t==='mgr')    renderMgr();
+  else if (t==='ops')    renderOps();
+  else if (t==='qa')     renderQA();
+  else if (t==='search') renderSearch();
 }
 
 function openModal(id) {
@@ -500,11 +494,11 @@ function openModal(id) {
   if (mYear) mYear.innerHTML = config.years.map(y=>
     `<option${(m?m.year:currentYear)===y?' selected':''}>${y}</option>`
   ).join('');
-  document.getElementById('m-title').value    = m ? m.title   : '';
-  document.getElementById('m-status').value   = m ? m.status  : '審稿/校稿';
-  document.getElementById('m-q').value        = m ? m.q       : 'Q1';
-  document.getElementById('m-date-zh').value  = m ? m.dateZh  : '';
-  document.getElementById('m-date-en').value  = m ? m.dateEn  : '';
+  document.getElementById('m-title').value     = m ? m.title  : '';
+  document.getElementById('m-status').value    = m ? m.status : '審稿/校稿';
+  document.getElementById('m-q').value         = m ? m.q      : 'Q1';
+  document.getElementById('m-date-zh').value   = m ? m.dateZh : '';
+  document.getElementById('m-date-en').value   = m ? m.dateEn : '';
   document.getElementById('m-live-zh').checked = m ? m.liveZh : false;
   document.getElementById('m-live-en').checked = m ? m.liveEn : false;
   document.getElementById('ops-modal').classList.add('open');
@@ -518,14 +512,14 @@ function saveArticle() {
   const title = document.getElementById('m-title').value.trim();
   if (!title) return;
   const data = {
-    year:    document.getElementById('m-year').value,
+    year:   document.getElementById('m-year').value,
     title,
-    status:  document.getElementById('m-status').value,
-    q:       document.getElementById('m-q').value,
-    dateZh:  document.getElementById('m-date-zh').value,
-    dateEn:  document.getElementById('m-date-en').value,
-    liveZh:  document.getElementById('m-live-zh').checked,
-    liveEn:  document.getElementById('m-live-en').checked,
+    status: document.getElementById('m-status').value,
+    q:      document.getElementById('m-q').value,
+    dateZh: document.getElementById('m-date-zh').value,
+    dateEn: document.getElementById('m-date-en').value,
+    liveZh: document.getElementById('m-live-zh').checked,
+    liveEn: document.getElementById('m-live-en').checked,
   };
   if (editingId) {
     const i = articles.findIndex(a=>a.id===editingId);
@@ -543,10 +537,235 @@ function exportCSV() {
   articles.filter(a=>a.year===currentYear).forEach(a =>
     rows.push([a.year,a.title,a.status,a.q,a.dateZh,a.dateEn,a.liveZh?'是':'否',a.liveEn?'是':'否'])
   );
-  const csv = rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const csv  = rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
   const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
   a.download = `articles_${currentYear}.csv`;
   a.click();
+}
+
+// ============================================================
+//  文章查詢分頁
+// ============================================================
+
+function renderSearch() {
+  const el = document.getElementById('view-search');
+  if (el.querySelector('.search-hero')) {
+    refreshSearchResults();
+    return;
+  }
+
+  const presetQA = (contentSummary.qa_pairs || []);
+
+  el.innerHTML = `
+    <div class="search-hero" style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px">AI 自然語言查詢</div>
+      <div style="font-size:11px;color:#888780;margin-bottom:12px">直接用說話的方式問問題，AI 自動比對 ${contentArticles.length} 篇文章回答</div>
+      ${presetQA.length > 0 ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          ${presetQA.slice(0,6).map(p=>`
+            <button onclick="askContentAI(this)" data-q="${p.q.replace(/"/g,'&quot;')}"
+              style="font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid #d3d1c7;background:#fff;color:#888780;cursor:pointer">${p.q}</button>
+          `).join('')}
+        </div>` : ''}
+      <div style="display:flex;gap:8px;margin-bottom:0">
+        <input id="search-ai-q" style="flex:1;font-size:13px;padding:10px 14px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;outline:none"
+          placeholder="例如：台北有伴手禮的文章有哪些？北部適合春天的自然生態文章？"
+          onkeydown="if(event.key==='Enter')runContentAI()">
+        <button id="search-ai-btn" onclick="runContentAI()"
+          style="font-size:12px;padding:10px 18px;border-radius:8px;border:1px solid #B5D4F4;background:#E6F1FB;color:#185FA5;cursor:pointer;font-weight:500;white-space:nowrap">
+          AI 查詢
+        </button>
+      </div>
+      <div id="search-ai-result" style="display:none;margin-top:12px;padding:12px 14px;background:#f5f5f3;border-radius:8px;font-size:12px;color:#1a1a1a;line-height:1.7"></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:500;margin-bottom:12px">條件篩選</div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:7px">主題探索</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="f-theme">
+          ${THEMES.map(t=>`<button class="fchip" data-group="theme" data-val="${t}" onclick="toggleFChip(this)">${t}</button>`).join('')}
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:7px">地方探索</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="f-region">
+          ${REGIONS.map(r=>`<button class="fchip" data-group="region" data-val="${r}" onclick="toggleFChip(this)">${r}</button>`).join('')}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:12px">
+        <div>
+          <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:7px">時令探索</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="f-season">
+            ${SEASONS.map(s=>`<button class="fchip" data-group="season" data-val="${s}" onclick="toggleFChip(this)">${s}</button>`).join('')}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:7px">包含內容</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="f-has">
+            ${HAS_OPTS.map(h=>`<button class="fchip" data-group="has" data-val="${h}" onclick="toggleFChip(this)">${h}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:7px">關鍵字搜尋（標題、縣市、地區、店家、景點）</div>
+        <input id="f-kw" style="width:100%;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;outline:none"
+          placeholder="例如：台北、九份、高粱酒" oninput="refreshSearchResults()">
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:12px;color:#888780" id="s-count">共 <strong style="color:#1a1a1a">0</strong> 篇</div>
+      <button onclick="clearSearch()" style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#888780;cursor:pointer">清除篩選</button>
+    </div>
+    <div id="s-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
+  `;
+
+  injectFChipStyle();
+  refreshSearchResults();
+}
+
+function injectFChipStyle() {
+  if (document.getElementById('fchip-style')) return;
+  const s = document.createElement('style');
+  s.id = 'fchip-style';
+  s.textContent = `
+    .fchip{font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid #d3d1c7;cursor:pointer;color:#888780;background:#fff;transition:all .15s}
+    .fchip:hover{background:#f1efe8;color:#1a1a1a}
+    .fchip.on{background:#185FA5;border-color:#185FA5;color:#fff}
+    .fchip[data-group="season"].on{background:#3B6D11;border-color:#3B6D11}
+    .fchip[data-group="has"].on{background:#0F6E56;border-color:#0F6E56}
+    .fchip[data-group="theme"].on{background:#534AB7;border-color:#534AB7}
+  `;
+  document.head.appendChild(s);
+}
+
+function toggleFChip(btn) {
+  const g   = btn.dataset.group;
+  const val = btn.dataset.val;
+  const map = {theme:activeThemes, region:activeRegions, season:activeSeasons, has:activeHas};
+  const set = map[g];
+  if (set.has(val)) { set.delete(val); btn.classList.remove('on'); }
+  else              { set.add(val);    btn.classList.add('on'); }
+  refreshSearchResults();
+}
+
+function filterContent() {
+  const kw = (document.getElementById('f-kw')||{}).value||'';
+  const kl = kw.toLowerCase().trim();
+  return contentArticles.filter(a => {
+    if (activeThemes.size  && ![...activeThemes].some(t  => a.theme.includes(t)))   return false;
+    if (activeRegions.size && ![...activeRegions].some(r => a.region.includes(r)))  return false;
+    if (activeSeasons.size && ![...activeSeasons].some(s => a.season.includes(s)))  return false;
+    for (const h of activeHas) {
+      if (h==='店家'   && !a.hasStore)  return false;
+      if (h==='小吃'   && !a.hasSnack)  return false;
+      if (h==='伴手禮' && !a.hasGift)   return false;
+      if (h==='景點'   && !a.hasSight)  return false;
+      if (h==='活動'   && !a.hasEvent)  return false;
+    }
+    if (kl) {
+      const blob = [a.title,a.city,a.area,a.storeKw,a.snackKw,a.giftKw,a.sightKw,a.eventKw].join(' ').toLowerCase();
+      if (!blob.includes(kl)) return false;
+    }
+    return true;
+  });
+}
+
+function refreshSearchResults() {
+  const results = filterContent();
+  const cnt = document.getElementById('s-count');
+  if (cnt) cnt.innerHTML = `共 <strong style="color:#1a1a1a">${results.length}</strong> 篇`;
+  const grid = document.getElementById('s-grid');
+  if (!grid) return;
+  if (results.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 0;color:#b4b2a9;font-size:13px">沒有符合條件的文章，試試調整篩選條件</div>';
+    return;
+  }
+  grid.innerHTML = results.map(a => {
+    const tags = [
+      ...a.theme.map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`),
+      ...a.region.map(r=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#E6F1FB;color:#185FA5">${r}</span>`),
+      ...a.season.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`),
+      `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#F1EFE8;color:#5F5E5A">${a.city}${a.area?'・'+a.area:''}</span>`,
+    ].join('');
+    const badges = [
+      {has:a.hasStore, label:'店家',   kw:a.storeKw},
+      {has:a.hasSnack, label:'小吃',   kw:a.snackKw},
+      {has:a.hasGift,  label:'伴手禮', kw:a.giftKw},
+      {has:a.hasSight, label:'景點',   kw:a.sightKw},
+      {has:a.hasEvent, label:'活動',   kw:a.eventKw},
+    ].map(b=>`<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#b4b2a9'}">${b.has?'✓':''} ${b.label}</span>`).join('');
+    const kwList = [a.storeKw,a.snackKw,a.giftKw,a.sightKw,a.eventKw].filter(Boolean).join('、');
+    return `<div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem">
+      <div style="font-size:13px;font-weight:500;color:#1a1a1a;margin-bottom:8px;line-height:1.4">${a.title}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${tags}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${badges}</div>
+      ${kwList?`<div style="font-size:10px;color:#b4b2a9;line-height:1.6">${kwList}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function clearSearch() {
+  activeThemes.clear(); activeRegions.clear(); activeSeasons.clear(); activeHas.clear();
+  document.querySelectorAll('.fchip.on').forEach(b=>b.classList.remove('on'));
+  const kw = document.getElementById('f-kw');
+  if (kw) kw.value = '';
+  const aiQ = document.getElementById('search-ai-q');
+  if (aiQ) aiQ.value = '';
+  const aiR = document.getElementById('search-ai-result');
+  if (aiR) aiR.style.display = 'none';
+  refreshSearchResults();
+}
+
+function askContentAI(btn) {
+  const q = btn.dataset.q;
+  const input = document.getElementById('search-ai-q');
+  if (input) input.value = q;
+  runContentAI();
+}
+
+async function runContentAI() {
+  const input = document.getElementById('search-ai-q');
+  const btn   = document.getElementById('search-ai-btn');
+  const res   = document.getElementById('search-ai-result');
+  if (!input || !btn || !res) return;
+  const q = input.value.trim();
+  if (!q) return;
+
+  btn.disabled    = true;
+  res.style.display = 'block';
+  res.textContent   = 'AI 比對資料庫中…';
+
+  const context = contentArticles.map(a =>
+    `- 《${a.title}》｜${a.city}${a.area}｜主題:${a.theme.join('+')}｜地方:${a.region.join('+')}｜時令:${a.season.join('+')}｜`+
+    (a.hasStore  ? `店家(${a.storeKw}) ` : '')+
+    (a.hasSnack  ? `小吃(${a.snackKw}) ` : '')+
+    (a.hasGift   ? `伴手禮(${a.giftKw}) ` : '')+
+    (a.hasSight  ? `景點(${a.sightKw}) ` : '')+
+    (a.hasEvent  ? `活動(${a.eventKw}) ` : '')
+  ).join('\n');
+
+  const GEMINI_KEY = window.__GEMINI_KEY__ || '';
+  if (!GEMINI_KEY) {
+    res.textContent = '請在 main.js 中設定 window.__GEMINI_KEY__';
+    btn.disabled = false;
+    return;
+  }
+
+  try {
+    const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
+    const body = JSON.stringify({contents:[{parts:[{text:
+      `你是內容資料庫助理。根據以下 ${contentArticles.length} 篇文章清單，用繁體中文精確回答問題。列出相關文章時請顯示標題與關鍵資訊，格式清晰，若無符合文章請直接說明。\n\n【文章資料庫】\n${context}\n\n【問題】${q}`
+    }]}]});
+    const resp   = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body});
+    const data   = await resp.json();
+    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回答';
+    res.innerHTML = answer.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  } catch(e) {
+    res.textContent = '查詢失敗，請確認 Gemini API Key 設定正確。';
+  }
+  btn.disabled = false;
 }
