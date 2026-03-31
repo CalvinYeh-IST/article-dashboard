@@ -173,6 +173,93 @@ tr:hover td{background:#fafaf8}
     </div>
   </div>
 </div>
+
+<style>
+.settings-btn{position:fixed;top:16px;right:20px;width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #d3d1c7;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;z-index:200;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+.settings-btn:hover{background:#f1efe8}
+.settings-panel{display:none;position:fixed;top:56px;right:20px;width:340px;background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
+.settings-panel.open{display:block}
+.settings-panel h4{font-size:13px;font-weight:500;margin-bottom:4px;color:#1a1a1a}
+.settings-panel p{font-size:11px;color:#888780;margin-bottom:12px;line-height:1.6}
+.settings-row{display:flex;gap:8px}
+.settings-input{flex:1;font-size:12px;padding:7px 10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;outline:none;font-family:monospace}
+.settings-input:focus{border-color:#185FA5}
+.settings-save{font-size:12px;padding:7px 14px;border-radius:8px;border:1px solid #B5D4F4;background:#E6F1FB;color:#185FA5;cursor:pointer;font-weight:500;white-space:nowrap}
+.settings-save:hover{background:#B5D4F4}
+.settings-status{font-size:11px;margin-top:8px;padding:6px 10px;border-radius:6px}
+.settings-status.ok{background:#EAF3DE;color:#3B6D11}
+.settings-status.empty{background:#FAEEDA;color:#854F0B}
+</style>
+
+<button class="settings-btn" onclick="toggleSettings()" title="API 設定">⚙</button>
+
+<div class="settings-panel" id="settings-panel">
+  <h4>Gemini API Key 設定</h4>
+  <p>Key 只存在你的瀏覽器本機，不會出現在程式碼或 GitHub 上。<br>換電腦或清除瀏覽器資料後需重新貼上。</p>
+  <div class="settings-row">
+    <input class="settings-input" id="settings-key-input" type="password" placeholder="貼上 AIza 開頭的 Key">
+    <button class="settings-save" onclick="saveGeminiKey()">儲存</button>
+  </div>
+  <div class="settings-status" id="settings-status"></div>
+</div>
+
+<script>
+function toggleSettings() {
+  const panel = document.getElementById('settings-panel');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open');
+  if (!isOpen) {
+    const saved = localStorage.getItem('gemini_key') || '';
+    const input = document.getElementById('settings-key-input');
+    if (saved) input.placeholder = 'Key 已設定（貼上新 Key 可覆蓋）';
+    updateSettingsStatus();
+  }
+}
+
+function saveGeminiKey() {
+  const input = document.getElementById('settings-key-input');
+  const val   = input.value.trim();
+  if (!val) {
+    updateSettingsStatus('請貼上你的 Gemini API Key', false);
+    return;
+  }
+  if (!val.startsWith('AIza')) {
+    updateSettingsStatus('格式不對，Key 應以 AIza 開頭', false);
+    return;
+  }
+  localStorage.setItem('gemini_key', val);
+  window.__GEMINI_KEY__ = val;
+  input.value       = '';
+  input.placeholder = 'Key 已設定（貼上新 Key 可覆蓋）';
+  updateSettingsStatus('儲存成功！AI 查詢功能已啟用', true);
+}
+
+function updateSettingsStatus(msg, ok) {
+  const el  = document.getElementById('settings-status');
+  const key = localStorage.getItem('gemini_key');
+  if (msg !== undefined) {
+    el.textContent = msg;
+    el.className   = 'settings-status ' + (ok ? 'ok' : 'empty');
+  } else if (key) {
+    el.textContent = 'Key 已設定，AI 查詢功能已啟用';
+    el.className   = 'settings-status ok';
+  } else {
+    el.textContent = '尚未設定 Key，AI 查詢功能暫時無法使用';
+    el.className   = 'settings-status empty';
+  }
+}
+
+document.addEventListener('click', e => {
+  const panel = document.getElementById('settings-panel');
+  if (panel.classList.contains('open') &&
+      !panel.contains(e.target) &&
+      !e.target.classList.contains('settings-btn')) {
+    panel.classList.remove('open');
+  }
+});
+
+window.__GEMINI_KEY__ = localStorage.getItem('gemini_key') || '';
+</script>
 <script src="main.js"></script>
 </body>
 </html>
