@@ -766,22 +766,37 @@ async function runContentAI() {
     return;
   }
 
-  try {
-    const url  = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
-    const body = JSON.stringify({contents:[{parts:[{text:
-      `你是內容資料庫助理。根據以下 ${contentArticles.length} 篇文章清單，用繁體中文精確回答問題。列出相關文章時請顯示標題與關鍵資訊，格式清晰，若無符合文章請直接說明。\n\n【文章資料庫】\n${context}\n\n【問題】${q}`
-    }]}]});
-    const resp   = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body});
-    const data   = await resp.json();
-    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回答';
-    const formatted = answer.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-    res.innerHTML = formatted;
-    if (AI_CACHE.size >= AI_CACHE_LIMIT) {
-      AI_CACHE.delete(AI_CACHE.keys().next().value);
+  const MODELS = [
+    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-2.5-flash-lite',
+  ];
+  const prompt = `你是內容資料庫助理。根據以下 ${contentArticles.length} 篇文章清單，用繁體中文精確回答問題。列出相關文章時請顯示標題與關鍵資訊，格式清晰，若無符合文章請直接說明。\n\n【文章資料庫】\n${context}\n\n【問題】${q}`;
+  let answered = false;
+  for (const model of MODELS) {
+    try {
+      const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+      const body = JSON.stringify({contents:[{parts:[{text:prompt}]}]});
+      const resp = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body});
+      const data = await resp.json();
+      if (data.error) {
+        console.warn(`${model} 失敗：`, data.error.code, data.error.message.slice(0,80));
+        continue;
+      }
+      const answer    = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回答';
+      const formatted = answer.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+      res.innerHTML = formatted;
+      if (AI_CACHE.size >= AI_CACHE_LIMIT) AI_CACHE.delete(AI_CACHE.keys().next().value);
+      AI_CACHE.set(cacheKey, formatted);
+      answered = true;
+      break;
+    } catch(e) {
+      console.warn(`${model} 例外：`, e.message);
     }
-    AI_CACHE.set(cacheKey, formatted);
-  } catch(e) {
-    res.textContent = '查詢失敗，請確認 Gemini API Key 設定正確。';
+  }
+  if (!answered) {
+    res.textContent = '所有模型今日額度已滿，請明天再試，或至 aistudio.google.com 確認用量。';
   }
   btn.disabled = false;
 }
