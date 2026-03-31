@@ -1,0 +1,15 @@
+[
+  {"id":1,"year":"2026","title":"生成式AI如何改變醫療產業","status":"已上架","q":"Q1","dateZh":"2026-01-15","dateEn":"2026-01-25","liveZh":true,"liveEn":true},
+  {"id":2,"year":"2026","title":"2026年台灣新創生態觀察","status":"已上架","q":"Q1","dateZh":"2026-02-10","dateEn":"2026-03-05","liveZh":true,"liveEn":true},
+  {"id":3,"year":"2026","title":"碳中和目標下的企業策略","status":"已上架","q":"Q1","dateZh":"2026-02-20","dateEn":"","liveZh":true,"liveEn":false},
+  {"id":4,"year":"2026","title":"量子運算的商業應用前景","status":"審稿/校稿","q":"Q2","dateZh":"2026-04-10","dateEn":"2026-04-25","liveZh":false,"liveEn":false},
+  {"id":5,"year":"2026","title":"東南亞電商市場深度分析","status":"待上架","q":"Q1","dateZh":"2026-03-25","dateEn":"","liveZh":false,"liveEn":false},
+  {"id":6,"year":"2026","title":"數位金融監管新趨勢","status":"翻譯中","q":"Q1","dateZh":"2026-03-20","dateEn":"2026-04-15","liveZh":true,"liveEn":false},
+  {"id":7,"year":"2026","title":"Web3與創作者經濟","status":"待上架","q":"Q2","dateZh":"2026-05-01","dateEn":"","liveZh":false,"liveEn":false},
+  {"id":8,"year":"2026","title":"全球供應鏈重組趨勢","status":"審稿/校稿","q":"Q2","dateZh":"2026-05-15","dateEn":"2026-05-28","liveZh":false,"liveEn":false},
+  {"id":9,"year":"2026","title":"元宇宙商業模式探索","status":"已上架","q":"Q1","dateZh":"2026-03-01","dateEn":"2026-03-15","liveZh":true,"liveEn":true},
+  {"id":10,"year":"2026","title":"ESG投資新框架","status":"已上架","q":"Q1","dateZh":"2026-03-10","dateEn":"2026-03-22","liveZh":true,"liveEn":true},
+  {"id":11,"year":"2025","title":"2025年AI產業報告","status":"已上架","q":"Q1","dateZh":"2025-02-01","dateEn":"2025-02-15","liveZh":true,"liveEn":true},
+  {"id":12,"year":"2025","title":"台灣半導體供應鏈","status":"已上架","q":"Q2","dateZh":"2025-05-01","dateEn":"2025-05-20","liveZh":true,"liveEn":false},
+  {"id":13,"year":"2024","title":"元宇宙2024展望","status":"已上架","q":"Q1","dateZh":"2024-01-10","dateEn":"2024-01-25","liveZh":true,"liveEn":true}
+]
