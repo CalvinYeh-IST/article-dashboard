@@ -533,6 +533,10 @@ function renderSearch() {
   const el = document.getElementById('view-search');
   if (el.querySelector('.search-hero')) { refreshSearchResults(); return; }
   const presetQA = (contentSummary.qa_pairs||[]);
+
+  injectFChipStyle();
+  injectCardStyle();
+  
   el.innerHTML = `
     <div class="search-hero" style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:14px;font-weight:500">AI 自然語言查詢</div><span style="font-size:11px;padding:3px 10px;border-radius:12px;background:#f1efe8;color:#888780">全資料庫 · 不受年份篩選影響</span></div>
@@ -568,6 +572,40 @@ function injectFChipStyle() {
   const s = document.createElement('style');
   s.id = 'fchip-style';
   s.textContent = `.fchip{font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid #d3d1c7;cursor:pointer;color:#888780;background:#fff}.fchip:hover{background:#f1efe8;color:#1a1a1a}.fchip.on{background:#185FA5;border-color:#185FA5;color:#fff}.fchip[data-group="season"].on{background:#3B6D11;border-color:#3B6D11}.fchip[data-group="has"].on{background:#0F6E56;border-color:#0F6E56}.fchip[data-group="theme"].on{background:#534AB7;border-color:#534AB7}`;
+  document.head.appendChild(s);
+}
+
+// 新增樣式注入函式，建議放在 injectFChipStyle 之後
+function injectCardStyle() {
+  if (document.getElementById('card-ui-style')) return;
+  const s = document.createElement('style');
+  s.id = 'card-ui-style';
+  s.textContent = `
+    #s-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important; gap: 20px !important; }
+    .article-card {
+      background: #ffffff; border: 1px solid #eef0f2; border-radius: 16px; padding: 20px;
+      display: flex; flex-direction: column; justify-content: space-between; height: 230px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02); position: relative; box-sizing: border-box;
+    }
+    .article-card:hover { transform: translateY(-6px); border-color: #185FA5; box-shadow: 0 12px 24px rgba(24, 95, 165, 0.1); }
+    .card-meta-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .badge-year { font-size: 10px; padding: 2px 8px; background: #fff7ed; color: #9a3412; border-radius: 6px; font-weight: 700; }
+    .loc-text { font-size: 11px; color: #888780; font-weight: 500; }
+    .card-title { font-size: 16px; font-weight: 600; color: #1a1a1a; line-height: 1.4; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .card-preview { font-size: 13px; color: #666; line-height: 1.6; margin: 12px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .tag-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .tag-pill { font-size: 10px; padding: 2px 10px; border-radius: 100px; font-weight: 500; }
+    .tag-region { background: #f0f7ff; color: #0056b3; }
+    .tag-theme  { background: #f3f0ff; color: #5b47fb; }
+    .tag-season { background: #f0fdf4; color: #166534; }
+    .content-status { font-size: 11px; display: flex; align-items: center; gap: 6px; padding-top: 12px; border-top: 1px solid #f8f9fa; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .has-data { color: #166534; font-weight: 500; }
+    .has-data .status-dot { background-color: #22c55e; }
+    .no-data { color: #b4b2a9; }
+    .no-data .status-dot { background-color: #d1d5db; }
+  `;
   document.head.appendChild(s);
 }
 
@@ -689,42 +727,46 @@ function closeArticleModal() {
   document.body.style.overflow = '';
 }
 
+// 請替換原本的 makeCard 函式
 function makeCard(a) {
   const loc    = [a.city, a.area].filter(Boolean).join(' ');
-  const haves  = [a.hasStore,a.hasSnack,a.hasGift,a.hasSight,a.hasEvent];
-  const labels = ['店家','小吃','伴手禮','景點','活動'];
-  const haveStr = labels.filter((_,i)=>haves[i]).join(' · ') || '—';
+  const haves  = [
+    { bit: a.hasStore, label: '店家' },
+    { bit: a.hasSnack, label: '小吃' },
+    { bit: a.hasGift,  label: '伴手禮' },
+    { bit: a.hasSight, label: '景點' },
+    { bit: a.hasEvent, label: '活動' }
+  ];
+  const activeHaves = haves.filter(h => h.bit).map(h => h.label).join(' · ');
   const preview = a.content
-    ? a.content.replace(/\n/g,' ').replace(/\s+/g,' ').trim().slice(0,55) + '…'
-    : '';
-  const themeStr  = a.theme.join(' · ');
-  const regionStr = a.region.join(' · ');
-  const seasonStr = a.season.join(' · ');
+    ? a.content.replace(/\n/g,' ').replace(/\s+/g,' ').trim().slice(0, 60) + '...'
+    : '點擊查看更多細節...';
 
-  return `<div onclick="openArticleModal(${a.id})"
-    style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem 1.125rem;cursor:pointer;display:flex;flex-direction:column;height:190px;box-sizing:border-box;overflow:hidden"
-    onmouseover="this.style.borderColor='#185FA5';this.style.boxShadow='0 0 0 2px #E6F1FB'"
-    onmouseout="this.style.borderColor='#e8e8e4';this.style.boxShadow='none'">
-
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;flex-shrink:0">
-      <div style="font-size:13px;font-weight:500;color:#1a1a1a;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${a.title}</div>
-      ${a.year ? `<span style="font-size:10px;padding:1px 7px;border-radius:8px;font-weight:500;background:#FAEEDA;color:#854F0B;flex-shrink:0;white-space:nowrap">${a.year}</span>` : ''}
-    </div>
-
-    <div style="font-size:11px;color:#b4b2a9;line-height:1.5;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:8px">${preview}</div>
-
-    <div style="flex-shrink:0">
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
-        ${loc ? `<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#f1efe8;color:#5F5E5A;font-weight:500">${loc}</span>` : ''}
-        ${a.region.map(r=>`<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#E6F1FB;color:#185FA5;font-weight:500">${r}</span>`).join('')}
-        ${a.theme.slice(0,1).map(t=>`<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#EEEDFE;color:#3C3489;font-weight:500">${t}</span>`).join('')}
-        ${a.season.slice(0,2).map(s=>`<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#EAF3DE;color:#3B6D11;font-weight:500">${s}</span>`).join('')}
+  return `
+    <div onclick="openArticleModal(${a.id})" class="article-card">
+      <div class="card-header">
+        <div class="card-meta-top">
+          ${a.year ? `<span class="badge-year">${a.year}</span>` : ''}
+          ${loc ? `<span class="loc-text">${loc}</span>` : ''}
+        </div>
+        <h3 class="card-title" title="${a.title}">${a.title}</h3>
       </div>
-      <div style="font-size:10px;color:${haves.some(Boolean)?'#3B6D11':'#d3d1c7'};background:${haves.some(Boolean)?'#EAF3DE':'#f5f5f3'};padding:3px 8px;border-radius:6px;display:inline-block">
-        ${haves.some(Boolean) ? '✓ ' + haveStr : '無特定資訊'}
+      <div class="card-body">
+        <p class="card-preview">${preview}</p>
+      </div>
+      <div class="card-footer">
+        <div class="tag-group">
+          ${a.region.map(r => `<span class="tag-pill tag-region">${r}</span>`).join('')}
+          ${a.theme.slice(0, 1).map(t => `<span class="tag-pill tag-theme">${t}</span>`).join('')}
+          ${a.season.slice(0, 1).map(s => `<span class="tag-pill tag-season">${s}</span>`).join('')}
+        </div>
+        <div class="content-status ${activeHaves ? 'has-data' : 'no-data'}">
+          <span class="status-dot"></span>
+          <span class="status-text">${activeHaves ? activeHaves : '一般紀錄'}</span>
+        </div>
       </div>
     </div>
-  </div>`;
+  `;
 }
 
 function refreshSearchResults() {
