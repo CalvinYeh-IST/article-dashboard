@@ -672,8 +672,7 @@ function makeCard(a) {
   ].map(b => `<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#d3d1c7'}">${b.has?'✓':''} ${b.label}</span>`).join('');
 
   const preview = a.content
-    ? a.content.replace(/
-/g,' ').slice(0,60) + (a.content.length>60?'…':'')
+    ? a.content.replace(/\n/g,' ').slice(0,60) + (a.content.length>60?'…':'')
     : '';
 
   return `<div onclick="openArticleModal(${a.id})"
