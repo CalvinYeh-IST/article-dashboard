@@ -600,12 +600,93 @@ function filterContent() {
   });
 }
 
+function openArticleModal(id) {
+  const a = contentArticles.find(x => x.id === id);
+  if (!a) return;
+  const hasList = [
+    {has:a.hasStore,  label:'店家',   kw:a.storeKw},
+    {has:a.hasSnack,  label:'小吃',   kw:a.snackKw},
+    {has:a.hasGift,   label:'伴手禮', kw:a.giftKw},
+    {has:a.hasSight,  label:'景點',   kw:a.sightKw},
+    {has:a.hasEvent,  label:'活動',   kw:a.eventKw},
+  ].filter(h => h.has);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'article-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto';
+  overlay.onclick = e => { if (e.target === overlay) closeArticleModal(); };
+
+  const regionColors = {'北部':'#E6F1FB;color:#185FA5','中部':'#EAF3DE;color:#3B6D11','南部':'#FAEEDA;color:#854F0B','東部':'#E1F5EE;color:#0F6E56','離島':'#EEEDFE;color:#3C3489'};
+
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+      <div style="padding:28px 32px 20px;border-bottom:1px solid #f1efe8">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px">
+          <h2 style="font-size:20px;font-weight:500;color:#1a1a1a;line-height:1.4;flex:1;margin:0">${a.title}</h2>
+          <button onclick="closeArticleModal()" style="width:32px;height:32px;border-radius:50%;border:1px solid #e8e8e4;background:#f5f5f3;cursor:pointer;font-size:16px;color:#888780;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          ${a.year ? `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#FAEEDA;color:#854F0B">${a.year}</span>` : ''}
+          ${a.city||a.area ? `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#f1efe8;color:#5F5E5A">${[a.city,a.area].filter(Boolean).join(' · ')}</span>` : ''}
+          ${a.region.map(r => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:${regionColors[r]||'#f1efe8;color:#888780'}">${r}</span>`).join('')}
+          ${a.theme.map(t => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`).join('')}
+          ${a.season.map(s => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`).join('')}
+        </div>
+        ${hasList.length > 0 ? `
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${hasList.map(h => `
+              <div style="background:#f5f5f3;border-radius:8px;padding:6px 10px">
+                <span style="font-size:10px;font-weight:500;color:#888780;display:block;margin-bottom:2px">${h.label}</span>
+                <span style="font-size:11px;color:#1a1a1a">${h.kw||'—'}</span>
+              </div>`).join('')}
+          </div>` : ''}
+      </div>
+      <div style="padding:24px 32px 32px">
+        <div style="font-size:14px;color:#1a1a1a;line-height:1.9;white-space:pre-wrap">${a.content || '（無內文）'}</div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+}
+
+function closeArticleModal() {
+  const el = document.getElementById('article-modal-overlay');
+  if (el) el.remove();
+  document.body.style.overflow = '';
+}
+
 function makeCard(a) {
-  const tags = [...a.theme.map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`),...a.region.map(r=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#E6F1FB;color:#185FA5">${r}</span>`),...a.season.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`),`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#F1EFE8;color:#5F5E5A">${a.city}${a.area?'・'+a.area:''}</span>`].join('');
-  const badges = [{has:a.hasStore,label:'店家'},{has:a.hasSnack,label:'小吃'},{has:a.hasGift,label:'伴手禮'},{has:a.hasSight,label:'景點'},{has:a.hasEvent,label:'活動'}].map(b=>`<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#b4b2a9'}">${b.has?'✓':''} ${b.label}</span>`).join('');
-  const kwList = [a.storeKw,a.snackKw,a.giftKw,a.sightKw,a.eventKw].filter(Boolean).join('、');
-  const yearTag = a.year ? `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#FAEEDA;color:#854F0B">${a.year}</span>` : '';
-  return `<div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px"><div style="font-size:13px;font-weight:500;color:#1a1a1a;line-height:1.4;flex:1">${a.title}</div>${yearTag}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${tags}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${badges}</div>${kwList?`<div style="font-size:10px;color:#b4b2a9;line-height:1.6">${kwList}</div>`:''}</div>`;
+  const yearTag = a.year
+    ? `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#FAEEDA;color:#854F0B">${a.year}</span>`
+    : '';
+  const locationTag = (a.city||a.area)
+    ? `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#f1efe8;color:#5F5E5A">${[a.city,a.area].filter(Boolean).join(' ')}</span>`
+    : '';
+  const themeTags  = a.theme.map(t  => `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`).join('');
+  const regionTags = a.region.map(r => `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#E6F1FB;color:#185FA5">${r}</span>`).join('');
+  const seasonTags = a.season.map(s => `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`).join('');
+  const hasBadges  = [
+    {has:a.hasStore,label:'店家'},{has:a.hasSnack,label:'小吃'},
+    {has:a.hasGift,label:'伴手禮'},{has:a.hasSight,label:'景點'},{has:a.hasEvent,label:'活動'},
+  ].map(b => `<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#d3d1c7'}">${b.has?'✓':''} ${b.label}</span>`).join('');
+
+  const preview = a.content
+    ? a.content.replace(/
+/g,' ').slice(0,60) + (a.content.length>60?'…':'')
+    : '';
+
+  return `<div onclick="openArticleModal(${a.id})"
+    style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s"
+    onmouseover="this.style.borderColor='#185FA5'" onmouseout="this.style.borderColor='#e8e8e4'">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:500;color:#1a1a1a;line-height:1.4;flex:1">${a.title}</div>
+      ${yearTag}
+    </div>
+    ${preview ? `<div style="font-size:11px;color:#888780;line-height:1.6;margin-bottom:8px">${preview}</div>` : ''}
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${locationTag}${themeTags}${regionTags}${seasonTags}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:6px;border-top:1px solid #f5f5f3">${hasBadges}</div>
+  </div>`;
 }
 
 function refreshSearchResults() {
