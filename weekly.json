@@ -1,4 +1,45 @@
 {
-  "updated": "2026-04-01 13:44",
-  "weeks": []
+  "updated": "2026-04-01 13:45",
+  "weeks": [
+    {
+      "week": "2026-W14",
+      "cnPlan": 10,
+      "cnAct": 9,
+      "cnReady": 22,
+      "cnRaw": 3,
+      "enPlan": 8,
+      "enAct": 6,
+      "enStock": 7,
+      "enPending": 18,
+      "cnCum": 9,
+      "enCum": 6,
+      "cnPlanCum": 10,
+      "enPlanCum": 8,
+      "cnAchieve": 90,
+      "enAchieve": 75,
+      "transRate": 67,
+      "enDanger": false,
+      "enWarn": true
+    },
+    {
+      "week": "2026-W15",
+      "cnPlan": 20,
+      "cnAct": 10,
+      "cnReady": 12,
+      "cnRaw": 2,
+      "enPlan": 6,
+      "enAct": 8,
+      "enStock": 6,
+      "enPending": 15,
+      "cnCum": 19,
+      "enCum": 14,
+      "cnPlanCum": 30,
+      "enPlanCum": 14,
+      "cnAchieve": 50,
+      "enAchieve": 133,
+      "transRate": 74,
+      "enDanger": false,
+      "enWarn": true
+    }
+  ]
 }
