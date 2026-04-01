@@ -19,7 +19,7 @@ let trendChart      = null;
 let achieveChart    = null;
 let editingId       = null;
 
-const THEMES   = ['文化美食','自然生態','常民生活','藝術文化'];
+const THEMES   = ['文化美食','自然生態','常民生活','藝術文化','綜覽台灣'];
 const REGIONS  = ['北部','中部','南部','東部','離島'];
 const SEASONS  = ['春','夏','秋','冬'];
 const HAS_OPTS = ['店家','小吃','伴手禮','景點','活動'];
@@ -282,7 +282,8 @@ function renderMgr() {
       }}
   });
 
-  if (weeks.length > 0) renderWeeklySection(weeks, overdue, stuck);
+  const yearWeeks = weeks.filter(w => w.week.startsWith(currentYear));
+  if (yearWeeks.length > 0) renderWeeklySection(yearWeeks, overdue, stuck);
   else document.getElementById('mgr-weekly-section').innerHTML = `
     <div class="kpi-block" style="margin-bottom:1rem;text-align:center;padding:2rem">
       <div style="font-size:13px;color:#888780">尚無週別記錄</div>
@@ -377,9 +378,9 @@ function renderWeeklySection(weeks, overdue, stuck) {
   const selectorHtml = `
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
       <span style="font-size:12px;color:#888780;margin-right:4px">切換週別</span>
-      ${weeks.map((w,i)=>`<button id="wbtn-${i}" onclick="selectWeekBtn(${i})"
+      ${weeks.filter(w=>w.week.startsWith(currentYear)).map((w,i)=>`<button id="wbtn-${i}" onclick="selectWeekBtn(${i})"
         style="padding:5px 14px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid #d3d1c7;background:${i===idx?'#185FA5':'#fff'};color:${i===idx?'#fff':'#888780'};font-weight:${i===idx?'500':'400'}"
-        >${w.week.replace('2026-','')}</button>`).join('')}
+        >${w.week}</button>`).join('')}
     </div>`;
 
   const chartHtml = `
@@ -534,7 +535,7 @@ function renderSearch() {
   const presetQA = (contentSummary.qa_pairs||[]);
   el.innerHTML = `
     <div class="search-hero" style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
-      <div style="font-size:14px;font-weight:500;margin-bottom:4px">AI 自然語言查詢</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:14px;font-weight:500">AI 自然語言查詢</div><span style="font-size:11px;padding:3px 10px;border-radius:12px;background:#f1efe8;color:#888780">全資料庫 · 不受年份篩選影響</span></div>
       <div style="font-size:11px;color:#888780;margin-bottom:12px">直接用說話的方式問問題，AI 自動比對 ${contentArticles.length} 篇文章回答</div>
       ${presetQA.length>0?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${presetQA.slice(0,6).map(p=>`<button onclick="askContentAI(this)" data-q="${p.q.replace(/"/g,'&quot;')}" style="font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid #d3d1c7;background:#fff;color:#888780;cursor:pointer">${p.q}</button>`).join('')}</div>`:''}
       <div style="display:flex;gap:8px">
@@ -599,19 +600,50 @@ function filterContent() {
   });
 }
 
+function makeCard(a) {
+  const tags = [...a.theme.map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`),...a.region.map(r=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#E6F1FB;color:#185FA5">${r}</span>`),...a.season.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`),`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#F1EFE8;color:#5F5E5A">${a.city}${a.area?'・'+a.area:''}</span>`].join('');
+  const badges = [{has:a.hasStore,label:'店家'},{has:a.hasSnack,label:'小吃'},{has:a.hasGift,label:'伴手禮'},{has:a.hasSight,label:'景點'},{has:a.hasEvent,label:'活動'}].map(b=>`<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#b4b2a9'}">${b.has?'✓':''} ${b.label}</span>`).join('');
+  const kwList = [a.storeKw,a.snackKw,a.giftKw,a.sightKw,a.eventKw].filter(Boolean).join('、');
+  const yearTag = a.year ? `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#FAEEDA;color:#854F0B">${a.year}</span>` : '';
+  return `<div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px"><div style="font-size:13px;font-weight:500;color:#1a1a1a;line-height:1.4;flex:1">${a.title}</div>${yearTag}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${tags}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${badges}</div>${kwList?`<div style="font-size:10px;color:#b4b2a9;line-height:1.6">${kwList}</div>`:''}</div>`;
+}
+
 function refreshSearchResults() {
+  const INIT_COUNT = 8;
   const results = filterContent();
   const cnt = document.getElementById('s-count');
   if (cnt) cnt.innerHTML = `共 <strong style="color:#1a1a1a">${results.length}</strong> 篇`;
   const grid = document.getElementById('s-grid');
   if (!grid) return;
   if (results.length===0) { grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px 0;color:#b4b2a9;font-size:13px">沒有符合條件的文章</div>'; return; }
-  grid.innerHTML = results.map(a => {
-    const tags = [...a.theme.map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`),...a.region.map(r=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#E6F1FB;color:#185FA5">${r}</span>`),...a.season.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`),`<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:#F1EFE8;color:#5F5E5A">${a.city}${a.area?'・'+a.area:''}</span>`].join('');
-    const badges = [{has:a.hasStore,label:'店家'},{has:a.hasSnack,label:'小吃'},{has:a.hasGift,label:'伴手禮'},{has:a.hasSight,label:'景點'},{has:a.hasEvent,label:'活動'}].map(b=>`<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#b4b2a9'}">${b.has?'✓':''} ${b.label}</span>`).join('');
-    const kwList = [a.storeKw,a.snackKw,a.giftKw,a.sightKw,a.eventKw].filter(Boolean).join('、');
-    return `<div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem"><div style="font-size:13px;font-weight:500;color:#1a1a1a;margin-bottom:8px;line-height:1.4">${a.title}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${tags}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${badges}</div>${kwList?`<div style="font-size:10px;color:#b4b2a9;line-height:1.6">${kwList}</div>`:''}</div>`;
-  }).join('');
+  const visible  = results.slice(0, INIT_COUNT);
+  const hidden   = results.slice(INIT_COUNT);
+  const hiddenId = 'search-hidden-grid';
+  grid.innerHTML =
+    visible.map(a => makeCard(a)).join('') +
+    (hidden.length > 0 ? `
+      <div style="grid-column:1/-1">
+        <div id="${hiddenId}" style="display:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:0" id="${hiddenId}">
+          ${hidden.map(a=>makeCard(a)).join('')}
+        </div>
+        <button id="search-expand-btn" onclick="toggleSearchExpand()" style="width:100%;margin-top:12px;padding:10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#888780;font-size:12px;cursor:pointer">
+          顯示更多 ${hidden.length} 篇結果
+        </button>
+      </div>` : '');
+
+  window._searchExpanded = false;
+  window.toggleSearchExpand = function() {
+    const hiddenGrid = document.getElementById(hiddenId);
+    const btn        = document.getElementById('search-expand-btn');
+    if (!hiddenGrid || !btn) return;
+    window._searchExpanded = !window._searchExpanded;
+    hiddenGrid.style.display = window._searchExpanded ? 'grid' : 'none';
+    btn.textContent = window._searchExpanded
+      ? '收合結果' 
+      : `顯示更多 ${hidden.length} 篇結果`;
+    btn.style.color = window._searchExpanded ? '#185FA5' : '#888780';
+    btn.style.borderColor = window._searchExpanded ? '#B5D4F4' : '#d3d1c7';
+  };
 }
 
 function clearSearch() {
