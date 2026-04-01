@@ -558,7 +558,7 @@ function renderSearch() {
       <div style="font-size:12px;color:#888780" id="s-count">共 <strong style="color:#1a1a1a">0</strong> 篇</div>
       <button onclick="clearSearch()" style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#888780;cursor:pointer">清除篩選</button>
     </div>
-    <div id="s-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>`;
+    <div id="s-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"></div>`;
   injectFChipStyle();
   refreshSearchResults();
 }
@@ -600,6 +600,32 @@ function filterContent() {
   });
 }
 
+function formatContent(raw) {
+  if (!raw) return '<p style="color:#b4b2a9">（無內文）</p>';
+  const cleaned = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  let paras = cleaned.split(/\n{2,}/);
+  if (paras.length <= 1) {
+    paras = cleaned
+      .replace(/([。！？!?])/g, '$1\n')
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    const merged = [];
+    let buf = '';
+    for (const s of paras) {
+      buf += s;
+      if (buf.length >= 60) { merged.push(buf); buf = ''; }
+    }
+    if (buf) merged.push(buf);
+    paras = merged.length > 0 ? merged : [cleaned];
+  }
+  return paras
+    .map(p => p.trim())
+    .filter(p => p.length > 0)
+    .map(p => `<p style="margin:0 0 1.1em 0;font-size:15px;color:#1a1a1a;line-height:1.9;text-align:justify">${p}</p>`)
+    .join('');
+}
+
 function openArticleModal(id) {
   const a = contentArticles.find(x => x.id === id);
   if (!a) return;
@@ -613,37 +639,44 @@ function openArticleModal(id) {
 
   const overlay = document.createElement('div');
   overlay.id = 'article-modal-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto';
   overlay.onclick = e => { if (e.target === overlay) closeArticleModal(); };
 
-  const regionColors = {'北部':'#E6F1FB;color:#185FA5','中部':'#EAF3DE;color:#3B6D11','南部':'#FAEEDA;color:#854F0B','東部':'#E1F5EE;color:#0F6E56','離島':'#EEEDFE;color:#3C3489'};
+  const regionColors = {'北部':'background:#E6F1FB;color:#185FA5','中部':'background:#EAF3DE;color:#3B6D11','南部':'background:#FAEEDA;color:#854F0B','東部':'background:#E1F5EE;color:#0F6E56','離島':'background:#EEEDFE;color:#3C3489'};
 
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
-      <div style="padding:28px 32px 20px;border-bottom:1px solid #f1efe8">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:700px;box-shadow:0 24px 64px rgba(0,0,0,0.18);overflow:hidden">
+
+      <div style="padding:28px 32px 22px;border-bottom:1.5px solid #f1efe8;position:sticky;top:0;background:#fff;z-index:1">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px">
-          <h2 style="font-size:20px;font-weight:500;color:#1a1a1a;line-height:1.4;flex:1;margin:0">${a.title}</h2>
-          <button onclick="closeArticleModal()" style="width:32px;height:32px;border-radius:50%;border:1px solid #e8e8e4;background:#f5f5f3;cursor:pointer;font-size:16px;color:#888780;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>
+          <h2 style="font-size:20px;font-weight:500;color:#1a1a1a;line-height:1.5;flex:1;margin:0;letter-spacing:-.01em">${a.title}</h2>
+          <button onclick="closeArticleModal()" style="width:32px;height:32px;border-radius:50%;border:1px solid #e8e8e4;background:#f5f5f3;cursor:pointer;font-size:18px;color:#888780;flex-shrink:0;line-height:1;padding:0">×</button>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:${hasList.length>0?'12px':'0'}">
           ${a.year ? `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#FAEEDA;color:#854F0B">${a.year}</span>` : ''}
           ${a.city||a.area ? `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#f1efe8;color:#5F5E5A">${[a.city,a.area].filter(Boolean).join(' · ')}</span>` : ''}
-          ${a.region.map(r => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:${regionColors[r]||'#f1efe8;color:#888780'}">${r}</span>`).join('')}
+          ${a.region.map(r => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;${regionColors[r]||'background:#f1efe8;color:#888780'}">${r}</span>`).join('')}
           ${a.theme.map(t => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`).join('')}
           ${a.season.map(s => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`).join('')}
         </div>
+
         ${hasList.length > 0 ? `
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px">
             ${hasList.map(h => `
-              <div style="background:#f5f5f3;border-radius:8px;padding:6px 10px">
-                <span style="font-size:10px;font-weight:500;color:#888780;display:block;margin-bottom:2px">${h.label}</span>
-                <span style="font-size:11px;color:#1a1a1a">${h.kw||'—'}</span>
+              <div style="background:#f9f9f7;border:1px solid #e8e8e4;border-radius:8px;padding:7px 10px">
+                <div style="font-size:10px;font-weight:500;color:#888780;margin-bottom:3px">${h.label}</div>
+                <div style="font-size:11px;color:#1a1a1a;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.kw||'—'}</div>
               </div>`).join('')}
           </div>` : ''}
       </div>
-      <div style="padding:24px 32px 32px">
-        <div style="font-size:14px;color:#1a1a1a;line-height:1.9;white-space:pre-wrap">${a.content || '（無內文）'}</div>
+
+      <div style="padding:28px 32px 36px;max-height:60vh;overflow-y:auto">
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto">
+          ${formatContent(a.content)}
+        </div>
       </div>
+
     </div>`;
 
   document.body.appendChild(overlay);
@@ -657,34 +690,40 @@ function closeArticleModal() {
 }
 
 function makeCard(a) {
-  const yearTag = a.year
-    ? `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#FAEEDA;color:#854F0B">${a.year}</span>`
-    : '';
-  const locationTag = (a.city||a.area)
-    ? `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#f1efe8;color:#5F5E5A">${[a.city,a.area].filter(Boolean).join(' ')}</span>`
-    : '';
-  const themeTags  = a.theme.map(t  => `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#EEEDFE;color:#3C3489">${t}</span>`).join('');
-  const regionTags = a.region.map(r => `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#E6F1FB;color:#185FA5">${r}</span>`).join('');
-  const seasonTags = a.season.map(s => `<span style="font-size:10px;padding:2px 8px;border-radius:8px;font-weight:500;background:#EAF3DE;color:#3B6D11">${s}</span>`).join('');
-  const hasBadges  = [
-    {has:a.hasStore,label:'店家'},{has:a.hasSnack,label:'小吃'},
-    {has:a.hasGift,label:'伴手禮'},{has:a.hasSight,label:'景點'},{has:a.hasEvent,label:'活動'},
-  ].map(b => `<span style="font-size:10px;padding:2px 7px;border-radius:6px;${b.has?'background:#EAF3DE;color:#3B6D11':'background:#f1efe8;color:#d3d1c7'}">${b.has?'✓':''} ${b.label}</span>`).join('');
-
+  const loc    = [a.city, a.area].filter(Boolean).join(' ');
+  const haves  = [a.hasStore,a.hasSnack,a.hasGift,a.hasSight,a.hasEvent];
+  const labels = ['店家','小吃','伴手禮','景點','活動'];
+  const haveStr = labels.filter((_,i)=>haves[i]).join(' · ') || '—';
   const preview = a.content
-    ? a.content.replace(/\n/g,' ').slice(0,60) + (a.content.length>60?'…':'')
+    ? a.content.replace(/\n/g,' ').replace(/\s+/g,' ').trim().slice(0,55) + '…'
     : '';
+  const themeStr  = a.theme.join(' · ');
+  const regionStr = a.region.join(' · ');
+  const seasonStr = a.season.join(' · ');
 
   return `<div onclick="openArticleModal(${a.id})"
-    style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s"
-    onmouseover="this.style.borderColor='#185FA5'" onmouseout="this.style.borderColor='#e8e8e4'">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
-      <div style="font-size:13px;font-weight:500;color:#1a1a1a;line-height:1.4;flex:1">${a.title}</div>
-      ${yearTag}
+    style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem 1.125rem;cursor:pointer;display:flex;flex-direction:column;height:190px;box-sizing:border-box;overflow:hidden"
+    onmouseover="this.style.borderColor='#185FA5';this.style.boxShadow='0 0 0 2px #E6F1FB'"
+    onmouseout="this.style.borderColor='#e8e8e4';this.style.boxShadow='none'">
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;flex-shrink:0">
+      <div style="font-size:13px;font-weight:500;color:#1a1a1a;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${a.title}</div>
+      ${a.year ? `<span style="font-size:10px;padding:1px 7px;border-radius:8px;font-weight:500;background:#FAEEDA;color:#854F0B;flex-shrink:0;white-space:nowrap">${a.year}</span>` : ''}
     </div>
-    ${preview ? `<div style="font-size:11px;color:#888780;line-height:1.6;margin-bottom:8px">${preview}</div>` : ''}
-    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${locationTag}${themeTags}${regionTags}${seasonTags}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:6px;border-top:1px solid #f5f5f3">${hasBadges}</div>
+
+    <div style="font-size:11px;color:#b4b2a9;line-height:1.5;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:8px">${preview}</div>
+
+    <div style="flex-shrink:0">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+        ${loc ? `<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#f1efe8;color:#5F5E5A;font-weight:500">${loc}</span>` : ''}
+        ${a.region.map(r=>`<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#E6F1FB;color:#185FA5;font-weight:500">${r}</span>`).join('')}
+        ${a.theme.slice(0,1).map(t=>`<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#EEEDFE;color:#3C3489;font-weight:500">${t}</span>`).join('')}
+        ${a.season.slice(0,2).map(s=>`<span style="font-size:10px;padding:1px 7px;border-radius:7px;background:#EAF3DE;color:#3B6D11;font-weight:500">${s}</span>`).join('')}
+      </div>
+      <div style="font-size:10px;color:${haves.some(Boolean)?'#3B6D11':'#d3d1c7'};background:${haves.some(Boolean)?'#EAF3DE':'#f5f5f3'};padding:3px 8px;border-radius:6px;display:inline-block">
+        ${haves.some(Boolean) ? '✓ ' + haveStr : '無特定資訊'}
+      </div>
+    </div>
   </div>`;
 }
 
