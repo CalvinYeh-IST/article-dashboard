@@ -619,17 +619,24 @@ function refreshSearchResults() {
   const visible  = results.slice(0, INIT_COUNT);
   const hidden   = results.slice(INIT_COUNT);
   const hiddenId = 'search-hidden-grid';
-  grid.innerHTML =
-    visible.map(a => makeCard(a)).join('') +
-    (hidden.length > 0 ? `
-      <div style="grid-column:1/-1">
-        <div id="${hiddenId}" style="display:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:0" id="${hiddenId}">
-          ${hidden.map(a=>makeCard(a)).join('')}
+
+  let hiddenHtml = '';
+  if (hidden.length > 0) {
+    hiddenHtml = `
+      <div style="grid-column:1/-1;margin-top:0">
+        <div id="${hiddenId}" style="display:none">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:12px">
+            ${hidden.map(a=>makeCard(a)).join('')}
+          </div>
         </div>
-        <button id="search-expand-btn" onclick="toggleSearchExpand()" style="width:100%;margin-top:12px;padding:10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#888780;font-size:12px;cursor:pointer">
+        <button id="search-expand-btn" onclick="toggleSearchExpand()"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#888780;font-size:12px;cursor:pointer">
           顯示更多 ${hidden.length} 篇結果
         </button>
-      </div>` : '');
+      </div>`;
+  }
+
+  grid.innerHTML = visible.map(a => makeCard(a)).join('') + hiddenHtml;
 
   window._searchExpanded = false;
   window.toggleSearchExpand = function() {
@@ -637,12 +644,12 @@ function refreshSearchResults() {
     const btn        = document.getElementById('search-expand-btn');
     if (!hiddenGrid || !btn) return;
     window._searchExpanded = !window._searchExpanded;
-    hiddenGrid.style.display = window._searchExpanded ? 'grid' : 'none';
+    hiddenGrid.style.display = window._searchExpanded ? 'block' : 'none';
     btn.textContent = window._searchExpanded
-      ? '收合結果' 
+      ? '收合結果'
       : `顯示更多 ${hidden.length} 篇結果`;
-    btn.style.color = window._searchExpanded ? '#185FA5' : '#888780';
-    btn.style.borderColor = window._searchExpanded ? '#B5D4F4' : '#d3d1c7';
+    btn.style.color        = window._searchExpanded ? '#185FA5' : '#888780';
+    btn.style.borderColor  = window._searchExpanded ? '#B5D4F4' : '#d3d1c7';
   };
 }
 
