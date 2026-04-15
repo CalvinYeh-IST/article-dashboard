@@ -81,6 +81,7 @@ function pctColor(p){return p>=100?'#0F6E56':p>=80?'#854F0B':'#A32D2D';}
 
 // ★ 更新：直接根據「日期欄位」判斷 KPI 數據
 function getKpiStats(arts, targetYear) {
+  // 只計算已上架（有日期即算），依上架日期分配到對應季度
   const lzQ={Q1:0,Q2:0,Q3:0,Q4:0}, leQ={Q1:0,Q2:0,Q3:0,Q4:0};
   const fzQ={Q1:0,Q2:0,Q3:0,Q4:0}, feQ={Q1:0,Q2:0,Q3:0,Q4:0};
 
@@ -114,7 +115,7 @@ function getKpiStats(arts, targetYear) {
 
 function kpiBlock(lang,stats,elId) {
   const kpi=config.kpi[FIXED_YEAR][lang];
-  const isZh=lang='zh';
+  const isZh=(lang==='zh');
   const liveByQ=isZh?stats.lzQ:stats.leQ;
   const totalT=Object.values(kpi).reduce((a,b)=>a+b,0);
   const totalL=Object.values(liveByQ).reduce((a,b)=>a+b,0);
@@ -352,29 +353,41 @@ function renderMgr() {
   const moCnA=nowMo?nowMo.cnAchieve:0;
   const moEnA=nowMo?nowMo.enAchieve:0;
 
-  const rateCard=(label,cnP,enP)=>`
-    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem">
-      <div style="font-size:11px;color:#888780;margin-bottom:8px">${label}</div>
-      <div style="margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-          <span style="color:#185FA5">CN 中文</span>
-          <span style="font-weight:500;color:${pctColor(cnP)}">${cnP}%</span>
+  const rateCard=(label,cnP,enP)=>{
+    const cnOk=cnP>=100,cnWn=cnP>=80;
+    const enOk=enP>=100,enWn=enP>=80;
+    const overallOk=cnP>=100&&enP>=100, overallWn=cnP>=80&&enP>=80;
+    const bg=overallOk?'#EAF3DE':overallWn?'#FAEEDA':'#fff';
+    const br=overallOk?'#C0DD97':overallWn?'#FAC775':'#e8e8e4';
+    return`<div style="background:${bg};border:1px solid ${br};border-radius:12px;padding:1rem">
+      <div style="font-size:10px;font-weight:500;color:#888780;margin-bottom:10px;letter-spacing:.02em">${label}</div>
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:#185FA5;font-weight:500">中文稿</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:18px;font-weight:500;color:${pctColor(cnP)}">${cnP}%</span>
+            <span style="font-size:9px;padding:1px 5px;border-radius:6px;background:${cnOk?'#EAF3DE':cnWn?'#FAEEDA':'#FCEBEB'};color:${pctColor(cnP)}">${cnOk?'達標':cnWn?'接近':'落後'}</span>
+          </div>
         </div>
-        ${pgBar(cnP,'#185FA5')}
+        ${pgBar(cnP,'#185FA5','5px')}
       </div>
       <div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-          <span style="color:#1D9E75">EN 英文</span>
-          <span style="font-weight:500;color:${pctColor(enP)}">${enP}%</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:#1D9E75;font-weight:500">英譯稿</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:18px;font-weight:500;color:${pctColor(enP)}">${enP}%</span>
+            <span style="font-size:9px;padding:1px 5px;border-radius:6px;background:${enOk?'#EAF3DE':enWn?'#FAEEDA':'#FCEBEB'};color:${pctColor(enP)}">${enOk?'達標':enWn?'接近':'落後'}</span>
+          </div>
         </div>
-        ${pgBar(enP,'#1D9E75')}
+        ${pgBar(enP,'#1D9E75','5px')}
       </div>
     </div>`;
+  };
 
   document.getElementById('view-mgr').innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem">
-      <span style="font-size:12px;padding:3px 14px;border-radius:12px;background:#185FA5;color:#fff;font-weight:500">總覽視角</span>
-      <span style="font-size:11px;color:#b4b2a9">底部文章分布涵蓋全資料庫 · 達標率嚴格對標 ${FIXED_YEAR} 年 KPI</span>
+      <span style="font-size:12px;padding:3px 14px;border-radius:12px;background:#185FA5;color:#fff;font-weight:500">${FIXED_YEAR}</span>
+      <span style="font-size:11px;color:#b4b2a9">主管報告版 · 固定顯示當年度</span>
     </div>
 
     <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
@@ -428,7 +441,7 @@ function renderMgr() {
               <span>EN</span><span style="color:${pctColor(m.enAchieve)};font-weight:500">${m.enAchieve}%</span>
             </div>
             ${pgBar(m.enAchieve,'#1D9E75')}
-            <div style="font-size:9px;color:#b4b2a9;margin-top:5px">CN ${m.cnAct}/${m.cnPlan} · EN ${m.enAct}/${m.enPlan}</div>
+            <div style="font-size:9px;color:#b4b2a9;margin-top:5px">中文稿 ${m.cnAct}/${m.cnPlan} · 英譯稿 ${m.enAct}/${m.enPlan}</div>
           </div>`).join('')}
       </div>`;
   } else {
@@ -601,17 +614,16 @@ function renderOps() {
     opsEl.innerHTML=`
       <div class="filter-bar">
         <input type="text" id="ops-search" placeholder="搜尋標題…" style="width:140px" oninput="renderOps()">
-        <select id="ops-status" onchange="renderOps()"><option value="">全部狀態</option><option>審稿/校稿</option><option>翻譯中</option><option>待上架</option><option>已上架</option></select>
-        <select id="ops-q" onchange="renderOps()"><option value="">全部季度</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select>
+        <select id="ops-status" onchange="renderOps()"><option value="">全部狀態</option><option>已上架</option><option>待上架</option><option>待改稿</option><option>待初審</option></select>
         <button class="btn-sm" onclick="exportCSV()">匯出 CSV</button>
         <button class="btn-sm btn-blue" onclick="openModal(null)">+ 新增文章</button>
       </div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th style="width:6%">年份</th><th style="width:30%">標題</th><th style="width:15%">狀態</th>
-            <th style="width:9%">季度</th><th style="width:16%">中文上架日</th><th style="width:16%">英文上架日</th>
-            <th style="width:8%"></th>
+            <th style="width:7%">年份</th><th style="width:38%">標題</th><th style="width:15%">狀態</th>
+            <th style="width:17%">中文上架日</th><th style="width:17%">英文上架日</th>
+            <th style="width:6%"></th>
           </tr></thead>
           <tbody id="ops-tbody"></tbody>
         </table>
@@ -621,22 +633,18 @@ function renderOps() {
   }
   const q=(document.getElementById('ops-search')||{}).value||'';
   const st=(document.getElementById('ops-status')||{}).value||'';
-  const qt=(document.getElementById('ops-q')||{}).value||'';
-  const smap={'審稿/校稿':'s0','翻譯中':'s1','待上架':'s2','已上架':'s3'};
+  const smap={'已上架':'s3','待上架':'s2','待改稿':'s1','待初審':'s0'};
   const f=articles.filter(a=>{
     if(opsYear!=='all'&&a.year!==opsYear) return false;
     if(q&&!a.title.toLowerCase().includes(q.toLowerCase())) return false;
     if(st&&a.status!==st) return false;
-    if(qt&&a.q!==qt) return false;
     return true;
   });
-  // ★ 更新：移除了對應的 <td> 勾選符號
   document.getElementById('ops-tbody').innerHTML=f.map(a=>`
     <tr>
       <td style="color:#888780">${a.year}</td>
       <td title="${a.title}">${a.title}</td>
       <td><span class="sbadge ${smap[a.status]||''}">${a.status}</span></td>
-      <td style="color:#888780">${a.q}</td>
       <td style="color:#888780">${a.dateZh||'—'}</td>
       <td style="color:#888780">${a.dateEn||'—'}</td>
       <td><button style="font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;border:1px solid #d3d1c7;background:#fff;color:#888780" onclick="openModal(${a.id})">編輯</button></td>
@@ -868,11 +876,19 @@ function renderDbStats(){
   let dbFilter='all';
   const el=document.getElementById('view-dbstats');
   el.innerHTML=`
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem">
-      <span style="font-size:12px;color:#888780">篩選範圍</span>
-      <button id="db-btn-all" onclick="setDbFilter('all')" style="padding:5px 16px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid #185FA5;background:#185FA5;color:#fff;font-weight:500">全資料庫</button>
-      <button id="db-btn-pub" onclick="setDbFilter('pub')" style="padding:5px 16px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid #d3d1c7;background:#fff;color:#888780">已上架</button>
-      <span id="db-total-badge" style="font-size:11px;color:#888780"></span>
+    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:#888780;font-weight:500">資料範圍</span>
+        <button id="db-btn-all" onclick="setDbFilter('all')"
+          style="padding:6px 18px;font-size:12px;border-radius:20px;cursor:pointer;border:2px solid #185FA5;background:#185FA5;color:#fff;font-weight:500">
+          全資料庫
+        </button>
+        <button id="db-btn-pub" onclick="setDbFilter('pub')"
+          style="padding:6px 18px;font-size:12px;border-radius:20px;cursor:pointer;border:2px solid #d3d1c7;background:#fff;color:#888780;font-weight:400">
+          已上架
+        </button>
+      </div>
+      <div id="db-total-badge" style="font-size:12px;color:#1a1a1a;font-weight:500"></div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
@@ -915,7 +931,7 @@ function renderDbStats(){
     const base=dbFilter==='pub'?contentArticles.filter(a=>a.dateZh):contentArticles;
     const total=base.length;
     const badge=document.getElementById('db-total-badge');
-    if(badge) badge.textContent=`共 ${total} 篇`;
+    if(badge) badge.textContent=dbFilter==='pub'?`已上架：${total} 篇`:`全資料庫：${total} 篇`;
 
     const themeMeta=document.getElementById('db-theme-meta');
     if(themeMeta) themeMeta.textContent=`${total} 篇中的佔比`;
