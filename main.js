@@ -114,52 +114,31 @@ function getKpiStats(arts, targetYear) {
 
 function kpiBlock(lang,stats,elId) {
   const kpi=config.kpi[FIXED_YEAR][lang];
-  const isZh=lang==='zh';
+  const isZh=lang='zh';
   const liveByQ=isZh?stats.lzQ:stats.leQ;
-  const fcByQ=isZh?stats.fzQ:stats.feQ;
   const totalT=Object.values(kpi).reduce((a,b)=>a+b,0);
   const totalL=Object.values(liveByQ).reduce((a,b)=>a+b,0);
-  const totalF=Object.values(fcByQ).reduce((a,b)=>a+b,0);
   const color=isZh?'#185FA5':'#1D9E75';
-  const colorLight=isZh?'#B5D4F4':'#9FE1CB';
   const rows=QS.map(q=>{
-    const t=kpi[q],l=liveByQ[q]||0,f=fcByQ[q]||0;
-    const lp=Math.min(100,pct(l,t)),fp=Math.min(100,pct(f,t));
+    const t=kpi[q],l=liveByQ[q]||0;
+    const lp=Math.min(100,pct(l,t));
     return`<div class="progress-row">
       <span class="p-label">${q} 目標 ${t}</span>
       <div class="p-track">
-        <div class="p-fc" style="width:${fp}%;background:${colorLight}"></div>
         <div class="p-ac" style="width:${lp}%;background:${color}"></div>
       </div>
-      <div class="p-nums">已上架 <strong>${l}</strong>，預計達 <strong>${f}</strong></div>
+      <div class="p-nums">已上架 <strong>${l}</strong> / ${t}</div>
       ${pill(pct(l,t))}
     </div>`;
   }).join('');
   document.getElementById(elId).innerHTML=`
     <div class="kpi-header">
-      <span class="kpi-title">${isZh?'中文稿':'英文稿'} ${FIXED_YEAR} KPI</span>
-      <span class="kpi-meta">目標 ${totalT} 篇｜已上架 ${totalL}，預計可達 ${totalF}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:#f5f5f3;border-radius:8px;padding:.75rem;text-align:center">
-        <div style="font-size:10px;color:#888780;margin-bottom:4px">全年目標</div>
-        <div style="font-size:22px;font-weight:500;color:#1a1a1a">${totalT}</div>
-      </div>
-      <div style="background:#f5f5f3;border-radius:8px;padding:.75rem;text-align:center">
-        <div style="font-size:10px;color:#888780;margin-bottom:4px">實際達成（落於今年）</div>
-        <div style="font-size:22px;font-weight:500;color:${color}">${totalL}</div>
-        <div style="font-size:10px;color:#b4b2a9">${pct(totalL,totalT)}% 達成</div>
-      </div>
-      <div style="background:#f5f5f3;border-radius:8px;padding:.75rem;text-align:center">
-        <div style="font-size:10px;color:#888780;margin-bottom:4px">預計可達</div>
-        <div style="font-size:22px;font-weight:500;color:#1a1a1a">${totalF}</div>
-        <div style="font-size:10px;color:#b4b2a9">${pct(totalF,totalT)}% 預估</div>
-      </div>
+      <span class="kpi-title">${isZh?'中文稿':'英譯稿'} ${FIXED_YEAR} KPI</span>
+      <span class="kpi-meta">全年目標 ${totalT} 篇｜已上架 ${totalL} 篇（${pct(totalL,totalT)}%）</span>
     </div>
     ${rows}
     <div class="legend-row">
       <span><span class="ld" style="background:${color}"></span>已上架</span>
-      <span><span class="ld" style="background:${colorLight}"></span>預計達成</span>
     </div>`;
 }
 
@@ -197,110 +176,113 @@ function setOpsYear(y){opsYear=y;buildOpsYearTabs();renderOps();}
 
 // ===== 分頁一：長官報告版 =====
 function renderExec() {
-  const allArts = contentArticles.length > 0 ? contentArticles : articles; // 優先使用完整內容資料
-  const total = allArts.length;
-  // ★ 更新計算邏輯：只要有填寫日期就算已上架
-  const cnPub = allArts.filter(a => !!a.dateZh).length;
-  const enPub = allArts.filter(a => !!a.dateEn).length;
-  const cnUnpub = total - cnPub;
-  const enUnpub = total - enPub;
-  // ★ 合併翻譯中與待翻譯為「待翻譯」
-  const pending = allArts.filter(a => a.dateZh && !a.dateEn).length;
+  // 使用 data.json（進度管理）作為計算來源
+  const arts = articles;
+  const total   = arts.length;
+  const cnPub   = arts.filter(a => !!a.dateZh).length;     // 中文稿：有上架日期即計入
+  const enPub   = arts.filter(a => !!a.dateEn).length;     // 英譯稿：有上架日期即計入
+  const unpub   = total - cnPub;                            // 未上架 = 總數 − 中文已上架
+  // 未上架狀態細分
+  const statusCounts = {
+    '待上架': arts.filter(a=>!a.dateZh && a.status==='待上架').length,
+    '待改稿': arts.filter(a=>!a.dateZh && a.status==='待改稿').length,
+    '待初審': arts.filter(a=>!a.dateZh && a.status==='待初審').length,
+  };
 
   document.getElementById('view-exec').innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem">
-      <span style="font-size:12px;padding:3px 14px;border-radius:12px;background:#185FA5;color:#fff;font-weight:500">總覽視角</span>
-      <span style="font-size:11px;color:#b4b2a9">頂部數據涵蓋全資料庫 · 下方對標 ${FIXED_YEAR} 年 KPI</span>
+      <span style="font-size:12px;padding:3px 14px;border-radius:12px;background:#185FA5;color:#fff;font-weight:500">${FIXED_YEAR}</span>
+      <span style="font-size:11px;color:#b4b2a9">長官報告版 · 固定顯示當年度</span>
     </div>
 
-    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:14px;padding:1.5rem;margin-bottom:1rem">
-      <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:8px;letter-spacing:.04em">2.1 全資料庫總文章數</div>
-      <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+    <!-- 總文章數（上方獨立一列） -->
+    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:11px;color:#888780;margin-bottom:4px;font-weight:500">全資料庫總文章數</div>
         <div style="font-size:52px;font-weight:500;color:#1a1a1a;line-height:1">${total}</div>
-        <div style="padding-bottom:6px">
-          <div style="font-size:12px;color:#888780;margin-bottom:6px">歷年累積總計</div>
-          <div style="display:flex;gap:12px;font-size:11px;color:#888780">
-            <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#185FA5;display:inline-block"></span>中文已上架 ${pct(cnPub,total)}%</span>
-            <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#1D9E75;display:inline-block"></span>英文已上架 ${pct(enPub,total)}%</span>
-            <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#f1efe8;border:1px solid #e8e8e4;display:inline-block"></span>未上架 ${pct(cnUnpub,total)}%</span>
-          </div>
-        </div>
+        <div style="font-size:11px;color:#b4b2a9;margin-top:4px">歷年累積 · 包含所有狀態</div>
       </div>
-      <div style="display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden">
-        ${cnPub>0?`<div style="flex:${cnPub};background:#185FA5" title="中文上架 ${cnPub}"></div>`:''}
-        ${enPub>0?`<div style="flex:${enPub};background:#1D9E75" title="英文上架 ${enPub}"></div>`:''}
-        ${cnUnpub>0?`<div style="flex:${cnUnpub};background:#f1efe8" title="未上架 ${cnUnpub}"></div>`:''}
+      <div style="display:flex;gap:10px">
+        <div style="text-align:center;padding:10px 16px;background:#f5f5f3;border-radius:10px">
+          <div style="font-size:10px;color:#888780;margin-bottom:4px">中文稿上架</div>
+          <div style="font-size:20px;font-weight:500;color:#185FA5">${cnPub}</div>
+          <div style="font-size:10px;color:#b4b2a9">${pct(cnPub,total)}%</div>
+        </div>
+        <div style="text-align:center;padding:10px 16px;background:#f5f5f3;border-radius:10px">
+          <div style="font-size:10px;color:#888780;margin-bottom:4px">英譯稿上架</div>
+          <div style="font-size:20px;font-weight:500;color:#1D9E75">${enPub}</div>
+          <div style="font-size:10px;color:#b4b2a9">${pct(enPub,total)}%</div>
+        </div>
       </div>
     </div>
 
+    <!-- 已上架 / 未上架 兩欄並排 -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+
+      <!-- 已上架 -->
       <div style="background:#E6F1FB;border:1px solid #B5D4F4;border-radius:14px;padding:1.25rem">
-        <div style="font-size:11px;font-weight:500;color:#185FA5;margin-bottom:10px">2.2 全資料庫已上架文章數</div>
-        <div style="font-size:36px;font-weight:500;color:#185FA5;line-height:1;margin-bottom:4px">${cnPub}</div>
-        ${pgBar(pct(cnPub,total),'#185FA5','8px')}
-        <div style="font-size:11px;color:#0C447C;margin-top:5px;margin-bottom:16px">${pct(cnPub,total)}% 的文章已上架</div>
+        <div style="font-size:11px;font-weight:500;color:#185FA5;margin-bottom:8px">已上架文章數</div>
+        <div style="font-size:44px;font-weight:500;color:#185FA5;line-height:1;margin-bottom:12px">${cnPub}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:rgba(255,255,255,0.75);border-radius:10px;padding:.875rem">
-            <div style="font-size:10px;color:#185FA5;margin-bottom:4px">2.2.1 中文總上架</div>
-            <div style="font-size:24px;font-weight:500;color:#185FA5">${cnPub}</div>
-            ${pgBar(pct(cnPub,total),'#185FA5')}
+          <div style="background:rgba(255,255,255,0.8);border-radius:10px;padding:.875rem">
+            <div style="font-size:10px;color:#185FA5;margin-bottom:4px;font-weight:500">中文稿上架</div>
+            <div style="font-size:26px;font-weight:500;color:#185FA5">${cnPub}</div>
+            <div style="font-size:10px;color:#0C447C;margin-top:3px">有中文上架日期</div>
           </div>
-          <div style="background:rgba(255,255,255,0.75);border-radius:10px;padding:.875rem">
-            <div style="font-size:10px;color:#0F6E56;margin-bottom:4px">2.2.2 英文總上架</div>
-            <div style="font-size:24px;font-weight:500;color:#1D9E75">${enPub}</div>
-            ${pgBar(pct(enPub,total),'#1D9E75')}
+          <div style="background:rgba(255,255,255,0.8);border-radius:10px;padding:.875rem">
+            <div style="font-size:10px;color:#0F6E56;margin-bottom:4px;font-weight:500">英譯稿上架</div>
+            <div style="font-size:26px;font-weight:500;color:#1D9E75">${enPub}</div>
+            <div style="font-size:10px;color:#085041;margin-top:3px">有英文上架日期</div>
           </div>
         </div>
       </div>
 
+      <!-- 未上架 -->
       <div style="background:#FAEEDA;border:1px solid #FAC775;border-radius:14px;padding:1.25rem">
-        <div style="font-size:11px;font-weight:500;color:#854F0B;margin-bottom:10px">2.3 全資料庫未上架（含待改稿）</div>
-        <div style="font-size:36px;font-weight:500;color:#854F0B;line-height:1;margin-bottom:4px">${cnUnpub}</div>
-        ${pgBar(pct(cnUnpub,total),'#EF9F27','8px')}
-        <div style="font-size:11px;color:#854F0B;margin-top:5px;margin-bottom:16px">${pct(cnUnpub,total)}% 仍在製作流程中</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div style="background:rgba(255,255,255,0.75);border-radius:10px;padding:.875rem">
-            <div style="font-size:10px;color:#854F0B;margin-bottom:4px">2.3.1 中文未上架</div>
-            <div style="font-size:24px;font-weight:500;color:#854F0B">${cnUnpub}</div>
-            ${pgBar(pct(cnUnpub,total),'#EF9F27')}
-          </div>
-          <div style="background:rgba(255,255,255,0.75);border-radius:10px;padding:.875rem">
-            <div style="font-size:10px;color:#854F0B;margin-bottom:4px">2.3.2 英文未上架</div>
-            <div style="font-size:24px;font-weight:500;color:#854F0B">${enUnpub}</div>
-            ${pgBar(pct(enUnpub,total),'#EF9F27')}
-          </div>
-        </div>
-        <div style="background:rgba(255,255,255,0.6);border-radius:10px;padding:.875rem;border-left:3px solid #888780">
-          <div style="font-size:10px;color:#888780;margin-bottom:4px">2.3.2.1 待翻譯（已有中文上架日、尚無英文上架日）</div>
-          <div style="font-size:22px;font-weight:500;color:#888780">${pending}</div>
+        <div style="font-size:11px;font-weight:500;color:#854F0B;margin-bottom:8px">未上架文章數</div>
+        <div style="font-size:44px;font-weight:500;color:#854F0B;line-height:1;margin-bottom:12px">${unpub}</div>
+        <div style="font-size:10px;color:#854F0B;margin-bottom:10px">= 總文章數 ${total} − 中文稿上架 ${cnPub}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${Object.entries(statusCounts).map(([s,n])=>n>0?`
+            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.7);border-radius:8px;padding:7px 10px">
+              <span style="font-size:11px;color:#854F0B">${s}</span>
+              <span style="font-size:14px;font-weight:500;color:#854F0B">${n} 篇</span>
+            </div>`:'').join('')}
+          ${statusCounts['待上架']+statusCounts['待改稿']+statusCounts['待初審']<unpub?`
+            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.5);border-radius:8px;padding:7px 10px">
+              <span style="font-size:11px;color:#888780">其他</span>
+              <span style="font-size:14px;font-weight:500;color:#888780">${unpub-statusCounts['待上架']-statusCounts['待改稿']-statusCounts['待初審']} 篇</span>
+            </div>`:''}
         </div>
       </div>
     </div>
 
+    <!-- 2026 KPI -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
       <div class="kpi-block" id="exec-kpi-zh"></div>
       <div class="kpi-block" id="exec-kpi-en"></div>
     </div>
 
+    <!-- 全年累積折線圖 -->
     <div class="kpi-block">
       <div class="kpi-header"><span class="kpi-title">${FIXED_YEAR} 全年累積上架進度</span><span class="kpi-meta">實際累積 vs 目標進度線</span></div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#888780;margin-bottom:10px">
-        <span><span class="ld" style="background:#185FA5"></span>中文實際</span>
-        <span><span class="ld" style="background:#1D9E75"></span>英文實際</span>
-        <span><span class="ld" style="background:#D3D1C7"></span>中文目標</span>
-        <span><span class="ld" style="background:#9FE1CB"></span>英文目標</span>
+        <span><span class="ld" style="background:#185FA5"></span>中文稿實際</span>
+        <span><span class="ld" style="background:#1D9E75"></span>英譯稿實際</span>
+        <span><span class="ld" style="background:#D3D1C7"></span>中文稿目標</span>
+        <span><span class="ld" style="background:#9FE1CB"></span>英譯稿目標</span>
       </div>
       <div class="chart-wrap" style="height:220px"><canvas id="exec-chart"></canvas></div>
     </div>
-    <div class="watermark">資料更新日期：${new Date().toLocaleDateString('zh-TW')} · 概覽涵蓋全資料庫</div>`;
+    <div class="watermark">資料更新日期：${new Date().toLocaleDateString('zh-TW')} · 資料來源：進度管理 Excel</div>`;
 
   const kpiStats = getKpiStats(articles, FIXED_YEAR);
   kpiBlock('zh', kpiStats, 'exec-kpi-zh');
   kpiBlock('en', kpiStats, 'exec-kpi-en');
-  
+
   const dZh = buildCumDataByYear('zh', articles, FIXED_YEAR);
   const dEn = buildCumDataByYear('en', articles, FIXED_YEAR);
-  
+
   if(execChart) execChart.destroy();
   execChart=new Chart(document.getElementById('exec-chart').getContext('2d'),{
     type:'line',
