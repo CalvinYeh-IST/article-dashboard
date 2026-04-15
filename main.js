@@ -79,30 +79,34 @@ function pill(p){const c=p>=100?'pct-ok':p>=60?'pct-warn':'pct-danger';return`<s
 function pgBar(p,color,h){h=h||'6px';return`<div style="height:${h};background:#f1efe8;border-radius:3px;overflow:hidden;margin-top:5px"><div style="height:100%;width:${Math.min(100,p)}%;background:${color};border-radius:3px;transition:width .4s"></div></div>`;}
 function pctColor(p){return p>=100?'#0F6E56':p>=80?'#854F0B':'#A32D2D';}
 
-// ★ 全新：根據實際「上架日期」計算特定年份的 KPI 數據
+// ★ 更新：直接根據「日期欄位」判斷 KPI 數據
 function getKpiStats(arts, targetYear) {
   const lzQ={Q1:0,Q2:0,Q3:0,Q4:0}, leQ={Q1:0,Q2:0,Q3:0,Q4:0};
   const fzQ={Q1:0,Q2:0,Q3:0,Q4:0}, feQ={Q1:0,Q2:0,Q3:0,Q4:0};
 
   arts.forEach(a => {
     // 中文 KPI
-    if (a.liveZh && a.dateZh && a.dateZh.startsWith(targetYear)) {
+    if (a.dateZh && a.dateZh.startsWith(targetYear)) {
       const q = 'Q' + Math.ceil((new Date(a.dateZh).getMonth() + 1) / 3);
       if (lzQ[q] !== undefined) lzQ[q]++;
-      if (fzQ[q] !== undefined) fzQ[q]++; // 已經上架必定計入預計達成
-    } else if (a.year === targetYear && (a.dateZh || a.liveZh)) {
-      const q = (a.dateZh && a.dateZh.startsWith(targetYear)) ? 'Q' + Math.ceil((new Date(a.dateZh).getMonth() + 1) / 3) : a.q;
+      if (fzQ[q] !== undefined) fzQ[q]++; // 已上架必定計入預估達成
+    } else if (a.year === targetYear && a.dateZh) {
+      const q = 'Q' + Math.ceil((new Date(a.dateZh).getMonth() + 1) / 3);
       if (fzQ[q] !== undefined) fzQ[q]++;
+    } else if (a.year === targetYear && !a.dateZh) {
+      if (fzQ[a.q] !== undefined) fzQ[a.q]++;
     }
 
     // 英文 KPI
-    if (a.liveEn && a.dateEn && a.dateEn.startsWith(targetYear)) {
+    if (a.dateEn && a.dateEn.startsWith(targetYear)) {
       const q = 'Q' + Math.ceil((new Date(a.dateEn).getMonth() + 1) / 3);
       if (leQ[q] !== undefined) leQ[q]++;
       if (feQ[q] !== undefined) feQ[q]++;
-    } else if (a.year === targetYear && (a.dateEn || a.liveEn)) {
-      const q = (a.dateEn && a.dateEn.startsWith(targetYear)) ? 'Q' + Math.ceil((new Date(a.dateEn).getMonth() + 1) / 3) : a.q;
+    } else if (a.year === targetYear && a.dateEn) {
+      const q = 'Q' + Math.ceil((new Date(a.dateEn).getMonth() + 1) / 3);
       if (feQ[q] !== undefined) feQ[q]++;
+    } else if (a.year === targetYear && !a.dateEn) {
+      if (feQ[a.q] !== undefined) feQ[a.q]++;
     }
   });
   return {lzQ, leQ, fzQ, feQ};
@@ -159,14 +163,13 @@ function kpiBlock(lang,stats,elId) {
     </div>`;
 }
 
-// ★ 更新：累積圖表也要根據實際年份繪製
+// ★ 更新：累積圖表依據日期有無
 function buildCumDataByYear(lang, arts, targetYear) {
   const kpi=config.kpi[targetYear][lang];
   const lbm=Array(12).fill(0);
   arts.forEach(a=>{
     const ds=lang==='zh'?a.dateZh:a.dateEn;
-    const lv=lang==='zh'?a.liveZh:a.liveEn;
-    if(lv && ds && ds.startsWith(targetYear)){
+    if(ds && ds.startsWith(targetYear)){
       const m=new Date(ds).getMonth();
       if(m>=0 && m<12) lbm[m]++;
     }
@@ -192,17 +195,17 @@ function buildOpsYearTabs() {
 }
 function setOpsYear(y){opsYear=y;buildOpsYearTabs();renderOps();}
 
-// ===== 分頁一：長官報告版（改為全資料庫概覽 + 特定年 KPI） =====
+// ===== 分頁一：長官報告版 =====
 function renderExec() {
-  // 1. 全資料庫統計
   const allArts = contentArticles.length > 0 ? contentArticles : articles; // 優先使用完整內容資料
   const total = allArts.length;
-  const cnPub = allArts.filter(a => a.dateZh && a.liveZh).length;
-  const enPub = allArts.filter(a => a.dateEn && a.liveEn).length;
+  // ★ 更新計算邏輯：只要有填寫日期就算已上架
+  const cnPub = allArts.filter(a => !!a.dateZh).length;
+  const enPub = allArts.filter(a => !!a.dateEn).length;
   const cnUnpub = total - cnPub;
   const enUnpub = total - enPub;
-  const translating = allArts.filter(a => !a.liveEn && a.status === '翻譯中').length;
-  const pending = allArts.filter(a => !a.liveEn && a.status !== '翻譯中' && a.liveZh).length;
+  // ★ 合併翻譯中與待翻譯為「待翻譯」
+  const pending = allArts.filter(a => a.dateZh && !a.dateEn).length;
 
   document.getElementById('view-exec').innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem">
@@ -267,15 +270,9 @@ function renderExec() {
             ${pgBar(pct(enUnpub,total),'#EF9F27')}
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:rgba(255,255,255,0.6);border-radius:10px;padding:.875rem;border-left:3px solid #534AB7">
-            <div style="font-size:10px;color:#534AB7;margin-bottom:4px">2.3.2.1 翻譯中</div>
-            <div style="font-size:22px;font-weight:500;color:#534AB7">${translating}</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.6);border-radius:10px;padding:.875rem;border-left:3px solid #888780">
-            <div style="font-size:10px;color:#888780;margin-bottom:4px">2.3.2.2 待翻譯</div>
-            <div style="font-size:22px;font-weight:500;color:#888780">${pending}</div>
-          </div>
+        <div style="background:rgba(255,255,255,0.6);border-radius:10px;padding:.875rem;border-left:3px solid #888780">
+          <div style="font-size:10px;color:#888780;margin-bottom:4px">2.3.2.1 待翻譯（已有中文上架日、尚無英文上架日）</div>
+          <div style="font-size:22px;font-weight:500;color:#888780">${pending}</div>
         </div>
       </div>
     </div>
@@ -341,15 +338,14 @@ function getMonthlyStats(weeks) {
     }));
 }
 
-// ===== 分頁二：主管報告版（全庫分佈 + 2026 KPI） =====
+// ===== 分頁二：主管報告版 =====
 function renderMgr() {
   const weeks=(weeklyData.weeks||[]).filter(w=>w.week.startsWith(FIXED_YEAR));
   const allArts = articles; // 使用全資料庫
   
-  // 計算全庫狀態（供逾期、圖表使用）
+  // ★ 更新：翻譯卡關定義 -> 已有中文上架日，且超過 7 天沒有英文上架日
   const today=new Date(); today.setHours(0,0,0,0);
-  const overdue=allArts.filter(a=>!a.liveZh&&a.dateZh&&new Date(a.dateZh)<today).length;
-  const stuck=allArts.filter(a=>a.status==='翻譯中'&&a.dateZh&&(today-new Date(a.dateZh))/86400000>7).length;
+  const stuck=allArts.filter(a=>a.dateZh&&!a.dateEn&&(today-new Date(a.dateZh))/86400000>7).length;
 
   // 取得 2026 KPI 數據
   const kpiStats = getKpiStats(allArts, FIXED_YEAR);
@@ -359,7 +355,7 @@ function renderMgr() {
   const totalLZh = Object.values(kpiStats.lzQ).reduce((a,b)=>a+b,0);
   const totalLEn = Object.values(kpiStats.leQ).reduce((a,b)=>a+b,0);
 
-  // 當前季度（用以對標 2026 當季 KPI）
+  // 當前季度
   const nowQ='Q'+(Math.ceil((new Date().getMonth()+1)/3));
   const qLZh=kpiStats.lzQ[nowQ]||0, qLEn=kpiStats.leQ[nowQ]||0;
   const qTZh=kpi.zh[nowQ]||0, qTEn=kpi.en[nowQ]||0;
@@ -428,13 +424,12 @@ function renderMgr() {
       <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#888780;margin-bottom:10px">
         <span><span class="ld" style="background:#185FA5"></span>中文上架</span>
         <span><span class="ld" style="background:#1D9E75"></span>英文上架</span>
-        <span><span class="ld" style="background:#EF9F27"></span>翻譯/待上架</span>
-        <span><span class="ld" style="background:#7F77DD"></span>審稿中</span>
+        <span><span class="ld" style="background:#888780"></span>待翻譯</span>
+        <span><span class="ld" style="background:#EF9F27"></span>待處理</span>
       </div>
       <div class="chart-wrap" style="height:200px"><canvas id="mgr-chart"></canvas></div>
     </div>`;
 
-  // 月別區塊
   const mgrMonthEl=document.getElementById('mgr-monthly-section');
   if(monthStats.length>0){
     mgrMonthEl.innerHTML=`
@@ -462,14 +457,14 @@ function renderMgr() {
   kpiBlock('en', kpiStats, 'mgr-kpi-en');
   
   if(mgrChart) mgrChart.destroy();
-  // 圖表改為顯示全資料庫的狀態分布
+  // ★ 更新圖表邏輯：利用日期判定
   mgrChart=new Chart(document.getElementById('mgr-chart').getContext('2d'),{
     type:'bar',
     data:{labels:QS,datasets:[
-      {label:'中文上架',data:QS.map(q=>allArts.filter(a=>a.q===q && a.liveZh).length),backgroundColor:'#185FA5'},
-      {label:'英文上架',data:QS.map(q=>allArts.filter(a=>a.q===q && a.liveEn).length),backgroundColor:'#1D9E75'},
-      {label:'翻譯/待上架',data:QS.map(q=>allArts.filter(a=>a.q===q&&(a.status==='翻譯中'||a.status==='待上架')).length),backgroundColor:'#EF9F27'},
-      {label:'審稿中',data:QS.map(q=>allArts.filter(a=>a.q===q&&a.status==='審稿/校稿').length),backgroundColor:'#7F77DD'},
+      {label:'中文上架',data:QS.map(q=>allArts.filter(a=>a.q===q && !!a.dateZh).length),backgroundColor:'#185FA5'},
+      {label:'英文上架',data:QS.map(q=>allArts.filter(a=>a.q===q && !!a.dateEn).length),backgroundColor:'#1D9E75'},
+      {label:'待翻譯',data:QS.map(q=>allArts.filter(a=>a.q===q && !!a.dateZh && !a.dateEn).length),backgroundColor:'#888780'},
+      {label:'待處理',data:QS.map(q=>allArts.filter(a=>a.q===q && !a.dateZh).length),backgroundColor:'#EF9F27'},
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
@@ -477,7 +472,7 @@ function renderMgr() {
         y:{stacked:true,grid:{color:'rgba(136,135,128,0.12)'},ticks:{color:'#888780',font:{size:11},stepSize:10}}}}
   });
 
-  if(weeks.length>0) renderWeeklySection(weeks,overdue,stuck);
+  if(weeks.length>0) renderWeeklySection(weeks,0,stuck);
   else document.getElementById('mgr-weekly-section').innerHTML=`
     <div class="kpi-block" style="margin-bottom:1rem;text-align:center;padding:2rem">
       <div style="font-size:13px;color:#888780">尚無 ${FIXED_YEAR} 週別記錄</div>
@@ -499,8 +494,7 @@ function renderWeeklySection(weeks,overdue,stuck) {
     if(w.transRate<80) actions.push({t:'warn',m:`中英轉譯率 ${w.transRate}%，低於建議值 80%，建議評估增加翻譯資源。`});
     if(w.enAchieve<80) actions.push({t:'urgent',m:`本週 EN 達成率僅 ${w.enAchieve}%，請確認翻譯卡關原因。`});
     if(w.cnAchieve>=100&&w.cnReady>15) actions.push({t:'normal',m:`CN 達成率 ${w.cnAchieve}%，庫存充裕，可推進翻譯。`});
-    if(overdue>0) actions.push({t:'warn',m:`共 ${overdue} 篇逾期未上架，請確認處理進度。`});
-    if(stuck>0) actions.push({t:'warn',m:`共 ${stuck} 篇翻譯超過 7 天未更新，需追蹤。`});
+    if(stuck>0) actions.push({t:'warn',m:`共 ${stuck} 篇上架超過 7 天仍未有英文上架日，需追蹤翻譯。`});
     if(actions.length===0) actions.push({t:'normal',m:'本週各項指標正常，請維持現有節奏。'});
 
     const row=(label,hint,cn,en)=>`
@@ -547,7 +541,7 @@ function renderWeeklySection(weeks,overdue,stuck) {
         <div style="font-size:10px;color:#888780;padding:5px 16px;background:#fafaf8;border-bottom:1px solid #f1efe8;font-weight:500">庫存水位</div>
         ${row('目前可用庫存','Ready，隨時可發',`<span style="font-size:22px;font-weight:500;color:#185FA5">${w.cnReady}</span><span style="font-size:11px;color:#888780;margin-left:4px">篇</span>`,`<span style="font-size:22px;font-weight:500;color:${sc}">${w.enStock}</span><span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;margin-left:8px;background:${ed?'#FCEBEB':ew?'#FAEEDA':'#EAF3DE'};color:${sc}">庫存${ed?'危險':ew?'注意':'正常'}</span>`)}
       </div>
-      <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
+      <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:12px">
         <div style="font-size:13px;font-weight:500;margin-bottom:12px">本週行動建議</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           ${actions.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;border:1px solid;${a.t==='urgent'?'background:#FCEBEB;border-color:#F7C1C1':a.t==='warn'?'background:#FAEEDA;border-color:#FAC775':'background:#EAF3DE;border-color:#C0DD97'}">
@@ -621,6 +615,7 @@ function renderWeeklySection(weeks,overdue,stuck) {
 function renderOps() {
   const opsEl=document.getElementById('view-ops');
   if(!opsEl.querySelector('table')){
+    // ★ 更新：移除了 <th>中文</th> 和 <th>英文</th>，調整了其他欄位的寬度分配
     opsEl.innerHTML=`
       <div class="filter-bar">
         <input type="text" id="ops-search" placeholder="搜尋標題…" style="width:140px" oninput="renderOps()">
@@ -632,9 +627,9 @@ function renderOps() {
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th style="width:6%">年份</th><th style="width:25%">標題</th><th style="width:11%">狀態</th>
-            <th style="width:6%">季度</th><th style="width:12%">中文上架日</th><th style="width:12%">英文上架日</th>
-            <th style="width:8%;text-align:center">中文</th><th style="width:8%;text-align:center">英文</th><th style="width:6%"></th>
+            <th style="width:6%">年份</th><th style="width:30%">標題</th><th style="width:15%">狀態</th>
+            <th style="width:9%">季度</th><th style="width:16%">中文上架日</th><th style="width:16%">英文上架日</th>
+            <th style="width:8%"></th>
           </tr></thead>
           <tbody id="ops-tbody"></tbody>
         </table>
@@ -653,6 +648,7 @@ function renderOps() {
     if(qt&&a.q!==qt) return false;
     return true;
   });
+  // ★ 更新：移除了對應的 <td> 勾選符號
   document.getElementById('ops-tbody').innerHTML=f.map(a=>`
     <tr>
       <td style="color:#888780">${a.year}</td>
@@ -661,8 +657,6 @@ function renderOps() {
       <td style="color:#888780">${a.q}</td>
       <td style="color:#888780">${a.dateZh||'—'}</td>
       <td style="color:#888780">${a.dateEn||'—'}</td>
-      <td style="text-align:center">${a.liveZh?'<span style="color:#0F6E56;font-weight:500">✓</span>':'<span style="color:#d3d1c7">—</span>'}</td>
-      <td style="text-align:center">${a.liveEn?'<span style="color:#0F6E56;font-weight:500">✓</span>':'<span style="color:#d3d1c7">—</span>'}</td>
       <td><button style="font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;border:1px solid #d3d1c7;background:#fff;color:#888780" onclick="openModal(${a.id})">編輯</button></td>
     </tr>`).join('');
 }
@@ -680,7 +674,7 @@ function renderQA() {
   const stats=yearData.stats||{};
   const hlHtml=highlights.length>0?highlights.map(h=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:0.5px solid #f1efe8"><div style="width:6px;height:6px;border-radius:50%;background:#185FA5;flex-shrink:0;margin-top:5px"></div><div style="font-size:13px;color:#1a1a1a;line-height:1.6">${h}</div></div>`).join(''):'<div style="font-size:12px;color:#b4b2a9;padding:12px 0">摘要產生中</div>';
   const qaHtml=qaPairs.length>0?qaPairs.map((p,i)=>`<div style="border:1px solid #e8e8e4;border-radius:8px;overflow:hidden;margin-bottom:8px"><div style="background:#f5f5f3;padding:8px 12px;font-size:12px;font-weight:500;color:#1a1a1a;cursor:pointer" onclick="toggleQA(${i})"><span style="color:#185FA5;margin-right:6px">Q</span>${p.q}</div><div id="qa-ans-${i}" style="display:none;padding:10px 12px;font-size:12px;color:#1a1a1a;line-height:1.6;border-top:1px solid #f1efe8"><span style="color:#1D9E75;font-weight:500;margin-right:6px">A</span>${p.a}</div></div>`).join(''):'<div style="font-size:12px;color:#b4b2a9;padding:12px 0">問答產生中</div>';
-  const od=(stats.overdue||[]).slice(0,5),sk=(stats.stuck||[]).slice(0,5);
+  const sk=(stats.stuck||[]).slice(0,5);
   document.getElementById('view-qa').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
       <div class="qa-wrap">
@@ -689,7 +683,6 @@ function renderQA() {
       </div>
       <div class="qa-wrap">
         <div class="qa-title" style="margin-bottom:14px">需注意項目</div>
-        ${od.length>0?`<div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:6px">逾期未上架（${stats.overdue?.length||0} 篇）</div>${od.map(t=>`<div style="font-size:11px;padding:4px 0;border-bottom:0.5px solid #f1efe8">${t}</div>`).join('')}`:'<div style="font-size:12px;color:#b4b2a9;margin-bottom:12px">無逾期文章</div>'}
         ${sk.length>0?`<div style="font-size:11px;font-weight:500;color:#854F0B;margin-top:12px;margin-bottom:6px">翻譯卡關（${stats.stuck?.length||0} 篇）</div>${sk.map(t=>`<div style="font-size:11px;padding:4px 0;border-bottom:0.5px solid #f1efe8">${t}</div>`).join('')}`:'<div style="font-size:12px;color:#b4b2a9;margin-top:12px">無翻譯卡關</div>'}
       </div>
     </div>
@@ -1083,6 +1076,7 @@ function openArticleModal(id){
 }
 function closeArticleModal(){const el=document.getElementById('article-modal-overlay');if(el) el.remove();document.body.style.overflow='';}
 
+// ★ 更新：移除了 live-zh, live-en 相關的勾選邏輯
 function openModal(id){
   editingId=id;const m=id?articles.find(a=>a.id===id):null;
   document.getElementById('modal-title').textContent=id?'編輯文章':'新增文章';
@@ -1093,22 +1087,21 @@ function openModal(id){
   document.getElementById('m-q').value=m?m.q:'Q1';
   document.getElementById('m-date-zh').value=m?m.dateZh:'';
   document.getElementById('m-date-en').value=m?m.dateEn:'';
-  document.getElementById('m-live-zh').checked=m?m.liveZh:false;
-  document.getElementById('m-live-en').checked=m?m.liveEn:false;
   document.getElementById('ops-modal').classList.add('open');
 }
 function closeModal(){document.getElementById('ops-modal').classList.remove('open');}
 function saveArticle(){
   const title=document.getElementById('m-title').value.trim();if(!title) return;
-  const data={year:document.getElementById('m-year').value,title,status:document.getElementById('m-status').value,q:document.getElementById('m-q').value,dateZh:document.getElementById('m-date-zh').value,dateEn:document.getElementById('m-date-en').value,liveZh:document.getElementById('m-live-zh').checked,liveEn:document.getElementById('m-live-en').checked};
+  const data={year:document.getElementById('m-year').value,title,status:document.getElementById('m-status').value,q:document.getElementById('m-q').value,dateZh:document.getElementById('m-date-zh').value,dateEn:document.getElementById('m-date-en').value};
   if(editingId){const i=articles.findIndex(a=>a.id===editingId);articles[i]={...articles[i],...data};}
   else articles.push({id:Date.now(),...data});
   closeModal();renderOps();
 }
+// ★ 更新：CSV 匯出也不再包含勾選欄位
 function exportCSV(){
   const base=opsYear==='all'?articles:articles.filter(a=>a.year===opsYear);
-  const rows=[['年份','標題','狀態','季度','中文上架日','英文上架日','中文已上架','英文已上架']];
-  base.forEach(a=>rows.push([a.year,a.title,a.status,a.q,a.dateZh,a.dateEn,a.liveZh?'是':'否',a.liveEn?'是':'否']));
+  const rows=[['年份','標題','狀態','季度','中文上架日','英文上架日']];
+  base.forEach(a=>rows.push([a.year,a.title,a.status,a.q,a.dateZh,a.dateEn]));
   const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`articles_${opsYear}.csv`;a.click();
