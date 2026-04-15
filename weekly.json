@@ -1,5 +1,5 @@
 {
-  "updated": "2026-04-15 13:23",
+  "updated": "2026-04-15 17:27",
   "weeks": [
     {
       "week": "2026-W14",
@@ -8,15 +8,15 @@
       "cnReady": 2,
       "cnRaw": 460,
       "enPlan": 8,
-      "enAct": 0,
+      "enAct": 23,
       "enStock": 24,
       "enPending": 528,
       "cnCum": 0,
-      "enCum": 0,
+      "enCum": 23,
       "cnPlanCum": 5,
       "enPlanCum": 8,
       "cnAchieve": 0,
-      "enAchieve": 0,
+      "enAchieve": 288,
       "transRate": 0,
       "enDanger": false,
       "enWarn": false
@@ -32,7 +32,7 @@
       "enStock": 17,
       "enPending": 528,
       "cnCum": 0,
-      "enCum": 0,
+      "enCum": 23,
       "cnPlanCum": 7,
       "enPlanCum": 15,
       "cnAchieve": 0,
@@ -52,7 +52,7 @@
       "enStock": 11,
       "enPending": 528,
       "cnCum": 0,
-      "enCum": 0,
+      "enCum": 23,
       "cnPlanCum": 14,
       "enPlanCum": 21,
       "cnAchieve": 0,
