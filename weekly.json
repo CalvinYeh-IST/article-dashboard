@@ -1,5 +1,5 @@
 {
-  "updated": "2026-04-15 17:27",
+  "updated": "2026-04-15 17:32",
   "weeks": [
     {
       "week": "2026-W14",
@@ -44,20 +44,20 @@
     {
       "week": "2026-W16",
       "cnPlan": 7,
-      "cnAct": 0,
+      "cnAct": 7,
       "cnReady": 2,
       "cnRaw": 451,
       "enPlan": 6,
       "enAct": 0,
       "enStock": 11,
       "enPending": 528,
-      "cnCum": 0,
+      "cnCum": 7,
       "enCum": 23,
       "cnPlanCum": 14,
       "enPlanCum": 21,
-      "cnAchieve": 0,
+      "cnAchieve": 100,
       "enAchieve": 0,
-      "transRate": 0,
+      "transRate": 329,
       "enDanger": false,
       "enWarn": false
     }
