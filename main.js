@@ -353,36 +353,50 @@ function renderMgr() {
   const moCnA=nowMo?nowMo.cnAchieve:0;
   const moEnA=nowMo?nowMo.enAchieve:0;
 
-  const rateCard=(label,cnP,enP)=>{
-    const cnOk=cnP>=100,cnWn=cnP>=80;
-    const enOk=enP>=100,enWn=enP>=80;
-    const overallOk=cnP>=100&&enP>=100, overallWn=cnP>=80&&enP>=80;
-    const bg=overallOk?'#EAF3DE':overallWn?'#FAEEDA':'#fff';
-    const br=overallOk?'#C0DD97':overallWn?'#FAC775':'#e8e8e4';
-    return`<div style="background:${bg};border:1px solid ${br};border-radius:12px;padding:1rem">
-      <div style="font-size:10px;font-weight:500;color:#888780;margin-bottom:10px;letter-spacing:.02em">${label}</div>
-      <div style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;color:#185FA5;font-weight:500">中文稿</span>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:18px;font-weight:500;color:${pctColor(cnP)}">${cnP}%</span>
-            <span style="font-size:9px;padding:1px 5px;border-radius:6px;background:${cnOk?'#EAF3DE':cnWn?'#FAEEDA':'#FCEBEB'};color:${pctColor(cnP)}">${cnOk?'達標':cnWn?'接近':'落後'}</span>
-          </div>
-        </div>
-        ${pgBar(cnP,'#185FA5','5px')}
+  // 達標燈號
+  const statusLight=(p)=>p>=100?'🟢':p>=80?'🟡':'🔴';
+  const statusText=(p)=>p>=100?'達標':p>=80?'接近':'落後';
+  const statusColor=(p)=>pctColor(p);
+  const statusBg=(p)=>p>=100?'#EAF3DE':p>=80?'#FAEEDA':'#FCEBEB';
+
+  // 達標率大表格列
+  const rateRow=(label,period,cnP,enP)=>`
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr;border-bottom:1px solid #f5f5f3;min-height:56px">
+      <div style="padding:10px 14px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid #f5f5f3">
+        <div style="font-size:12px;font-weight:500;color:#1a1a1a">${label}</div>
+        ${period?`<div style="font-size:10px;color:#b4b2a9;margin-top:2px">${period}</div>`:''}
       </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:11px;color:#1D9E75;font-weight:500">英譯稿</span>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:18px;font-weight:500;color:${pctColor(enP)}">${enP}%</span>
-            <span style="font-size:9px;padding:1px 5px;border-radius:6px;background:${enOk?'#EAF3DE':enWn?'#FAEEDA':'#FCEBEB'};color:${pctColor(enP)}">${enOk?'達標':enWn?'接近':'落後'}</span>
+      <div style="padding:10px 16px;border-right:1px solid #f5f5f3">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:11px;color:#185FA5;font-weight:500">中文稿</span>
+          <div style="display:flex;align-items:center;gap:5px">
+            <span style="font-size:16px;font-weight:500;color:${statusColor(cnP)}">${cnP}%</span>
+            <span style="font-size:9px;padding:1px 6px;border-radius:6px;background:${statusBg(cnP)};color:${statusColor(cnP)}">${statusText(cnP)}</span>
           </div>
         </div>
-        ${pgBar(enP,'#1D9E75','5px')}
+        ${pgBar(cnP,'#185FA5','4px')}
+      </div>
+      <div style="padding:10px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:11px;color:#1D9E75;font-weight:500">英譯稿</span>
+          <div style="display:flex;align-items:center;gap:5px">
+            <span style="font-size:16px;font-weight:500;color:${statusColor(enP)}">${enP}%</span>
+            <span style="font-size:9px;padding:1px 6px;border-radius:6px;background:${statusBg(enP)};color:${statusColor(enP)}">${statusText(enP)}</span>
+          </div>
+        </div>
+        ${pgBar(enP,'#1D9E75','4px')}
       </div>
     </div>`;
-  };
+
+  const yrCnP=pct(totalLZh,totalTZh), yrEnP=pct(totalLEn,totalTEn);
+  const qCnP=pct(qLZh,qTZh), qEnP=pct(qLEn,qTEn);
+  const overallOk=yrCnP>=100&&yrEnP>=100, overallWn=yrCnP>=80&&yrEnP>=80;
+
+  // 英譯庫存
+  const invColor=(lastWeek&&lastWeek.enDanger)?'#A32D2D':(lastWeek&&lastWeek.enWarn)?'#854F0B':'#1D9E75';
+  const invBg=(lastWeek&&lastWeek.enDanger)?'#FCEBEB':(lastWeek&&lastWeek.enWarn)?'#FAEEDA':'#EAF3DE';
+  const invBorder=(lastWeek&&lastWeek.enDanger)?'#F7C1C1':(lastWeek&&lastWeek.enWarn)?'#FAC775':'#C0DD97';
+  const invText=lastWeek?(lastWeek.enDanger?'低於警戒，需立即補充':lastWeek.enWarn?'接近警戒，建議補充':'安全水位'):'尚無資料';
 
   document.getElementById('view-mgr').innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem">
@@ -390,17 +404,40 @@ function renderMgr() {
       <span style="font-size:11px;color:#b4b2a9">主管報告版 · 固定顯示當年度</span>
     </div>
 
-    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:1rem">
-      <div style="font-size:13px;font-weight:500;margin-bottom:14px">3.1 營運達標率概覽（${FIXED_YEAR} 年度）</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
-        ${rateCard(`全年 KPI 達標率`,pct(totalLZh,totalTZh),pct(totalLEn,totalTEn))}
-        ${rateCard(`當季 KPI 達標率（${nowQ}）`,pct(qLZh,qTZh),pct(qLEn,qTEn))}
-        ${rateCard(`當月進度達成率`,moCnA,moEnA)}
-        ${rateCard(`當週進度達成率`,wkCnA,wkEnA)}
-        <div style="background:${(lastWeek&&lastWeek.enDanger)?'#FCEBEB':(lastWeek&&lastWeek.enWarn)?'#FAEEDA':'#EAF3DE'};border:1px solid ${(lastWeek&&lastWeek.enDanger)?'#F7C1C1':(lastWeek&&lastWeek.enWarn)?'#FAC775':'#C0DD97'};border-radius:12px;padding:1rem">
-          <div style="font-size:11px;color:${(lastWeek&&lastWeek.enDanger)?'#A32D2D':(lastWeek&&lastWeek.enWarn)?'#854F0B':'#3B6D11'};margin-bottom:8px">英譯庫存水位</div>
-          <div style="font-size:32px;font-weight:500;color:${(lastWeek&&lastWeek.enDanger)?'#A32D2D':(lastWeek&&lastWeek.enWarn)?'#854F0B':'#1D9E75'};line-height:1">${lastWeek?lastWeek.enStock:'—'}</div>
-          <div style="font-size:11px;margin-top:5px;color:${(lastWeek&&lastWeek.enDanger)?'#A32D2D':(lastWeek&&lastWeek.enWarn)?'#854F0B':'#3B6D11'}">${lastWeek?(lastWeek.enDanger?'🔴 危險：需立即補充':(lastWeek.enWarn?'🟡 偏低：建議補充':'🟢 水位正常')):'尚無資料'}</div>
+    <!-- 達標率概覽 -->
+    <div style="background:#fff;border:1px solid #e8e8e4;border-radius:14px;overflow:hidden;margin-bottom:1rem">
+
+      <!-- 標題列 -->
+      <div style="display:grid;grid-template-columns:120px 1fr 1fr;background:#fafaf8;border-bottom:1px solid #e8e8e4">
+        <div style="padding:10px 14px;font-size:11px;color:#888780;font-weight:500;border-right:1px solid #e8e8e4">達標率概覽</div>
+        <div style="padding:10px 16px;font-size:11px;color:#185FA5;font-weight:500;border-right:1px solid #e8e8e4;display:flex;align-items:center;gap:4px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#185FA5;display:inline-block"></span>中文稿
+        </div>
+        <div style="padding:10px 16px;font-size:11px;color:#1D9E75;font-weight:500;display:flex;align-items:center;gap:4px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#1D9E75;display:inline-block"></span>英譯稿
+        </div>
+      </div>
+
+      ${rateRow('全年 KPI',`目標 ${totalTZh} / ${totalTEn} 篇`,yrCnP,yrEnP)}
+      ${rateRow('本季 KPI',nowQ,qCnP,qEnP)}
+      ${rateRow('本月進度',new Date().toLocaleDateString('zh-TW',{month:'long'}),moCnA,moEnA)}
+      ${rateRow('本週進度',lastWeek?lastWeek.week:'—',wkCnA,wkEnA)}
+
+      <!-- 庫存水位列 -->
+      <div style="display:grid;grid-template-columns:120px 1fr;background:${invBg};border-top:2px solid ${invBorder}">
+        <div style="padding:12px 14px;border-right:1px solid ${invBorder}">
+          <div style="font-size:12px;font-weight:500;color:${invColor}">英譯稿庫存</div>
+          <div style="font-size:10px;color:${invColor};margin-top:2px;opacity:0.8">${invText}</div>
+        </div>
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:12px">
+          <span style="font-size:36px;font-weight:500;color:${invColor};line-height:1">${lastWeek?lastWeek.enStock:'—'}</span>
+          <div>
+            <div style="font-size:11px;color:${invColor};font-weight:500">篇可上架</div>
+            <div style="font-size:10px;color:${invColor};opacity:0.8;margin-top:2px">
+              ${lastWeek?`待翻：${lastWeek.enPending} 篇排隊中`:''}
+            </div>
+          </div>
+          ${lastWeek&&lastWeek.enDanger?`<span style="font-size:20px">🔴</span>`:lastWeek&&lastWeek.enWarn?`<span style="font-size:20px">🟡</span>`:`<span style="font-size:20px">🟢</span>`}
         </div>
       </div>
     </div>
@@ -414,16 +451,7 @@ function renderMgr() {
       <div class="kpi-block" id="mgr-kpi-en"></div>
     </div>
 
-    <div class="kpi-block">
-      <div class="kpi-header"><span class="kpi-title">全資料庫：各季文章狀態分布</span><span class="kpi-meta">涵蓋歷年所有資料</span></div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#888780;margin-bottom:10px">
-        <span><span class="ld" style="background:#185FA5"></span>中文上架</span>
-        <span><span class="ld" style="background:#1D9E75"></span>英文上架</span>
-        <span><span class="ld" style="background:#888780"></span>待翻譯</span>
-        <span><span class="ld" style="background:#EF9F27"></span>待處理</span>
-      </div>
-      <div class="chart-wrap" style="height:200px"><canvas id="mgr-chart"></canvas></div>
-    </div>`;
+`;
 
   const mgrMonthEl=document.getElementById('mgr-monthly-section');
   if(monthStats.length>0){
@@ -434,11 +462,11 @@ function renderMgr() {
           <div style="padding:.75rem;background:#f9f9f7;border-radius:8px;border:1px solid #f1efe8">
             <div style="font-size:11px;font-weight:500;color:#1a1a1a;margin-bottom:7px">${m.label}</div>
             <div style="font-size:10px;color:#888780;margin-bottom:2px;display:flex;justify-content:space-between">
-              <span>CN</span><span style="color:${pctColor(m.cnAchieve)};font-weight:500">${m.cnAchieve}%</span>
+              <span>中文稿</span><span style="color:${pctColor(m.cnAchieve)};font-weight:500">${m.cnAchieve}%</span>
             </div>
             ${pgBar(m.cnAchieve,'#185FA5')}
             <div style="font-size:10px;color:#888780;margin-top:5px;margin-bottom:2px;display:flex;justify-content:space-between">
-              <span>EN</span><span style="color:${pctColor(m.enAchieve)};font-weight:500">${m.enAchieve}%</span>
+              <span>英譯稿</span><span style="color:${pctColor(m.enAchieve)};font-weight:500">${m.enAchieve}%</span>
             </div>
             ${pgBar(m.enAchieve,'#1D9E75')}
             <div style="font-size:9px;color:#b4b2a9;margin-top:5px">中文稿 ${m.cnAct}/${m.cnPlan} · 英譯稿 ${m.enAct}/${m.enPlan}</div>
@@ -451,21 +479,7 @@ function renderMgr() {
   kpiBlock('zh', kpiStats, 'mgr-kpi-zh');
   kpiBlock('en', kpiStats, 'mgr-kpi-en');
   
-  if(mgrChart) mgrChart.destroy();
-  // ★ 更新圖表邏輯：利用日期判定
-  mgrChart=new Chart(document.getElementById('mgr-chart').getContext('2d'),{
-    type:'bar',
-    data:{labels:QS,datasets:[
-      {label:'中文上架',data:QS.map(q=>allArts.filter(a=>a.q===q && !!a.dateZh).length),backgroundColor:'#185FA5'},
-      {label:'英文上架',data:QS.map(q=>allArts.filter(a=>a.q===q && !!a.dateEn).length),backgroundColor:'#1D9E75'},
-      {label:'待翻譯',data:QS.map(q=>allArts.filter(a=>a.q===q && !!a.dateZh && !a.dateEn).length),backgroundColor:'#888780'},
-      {label:'待處理',data:QS.map(q=>allArts.filter(a=>a.q===q && !a.dateZh).length),backgroundColor:'#EF9F27'},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
-      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#888780',font:{size:11}}},
-        y:{stacked:true,grid:{color:'rgba(136,135,128,0.12)'},ticks:{color:'#888780',font:{size:11},stepSize:10}}}}
-  });
+
 
   if(weeks.length>0) renderWeeklySection(weeks,0,stuck);
   else document.getElementById('mgr-weekly-section').innerHTML=`
@@ -479,68 +493,105 @@ function renderWeeklySection(weeks,overdue,stuck) {
   function pCtColor(p){return p>=100?'#0F6E56':p>=80?'#854F0B':'#A32D2D';}
   function pCtBadge(p){return`font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:${p>=100?'#EAF3DE':p>=80?'#FAEEDA':'#FCEBEB'};color:${pCtColor(p)}`;}
 
+
+  function weekDateRange(weekStr) {
+    const parts = weekStr.split('-W');
+    if (parts.length < 2) return weekStr;
+    const yr = parseInt(parts[0]), wk = parseInt(parts[1]);
+    const jan4 = new Date(yr, 0, 4);
+    const startDay = jan4.getDate() - (jan4.getDay()||7) + 1 + (wk-1)*7;
+    const start = new Date(yr, 0, startDay);
+    const end   = new Date(yr, 0, startDay + 6);
+    const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+    return `${fmt(start)}–${fmt(end)}`;
+  }
   function weekCard(w) {
     const tc=w.transRate>=80?'#1D9E75':w.transRate>=50?'#EF9F27':'#E24B4A';
-    const ed=w.enDanger,ew=w.enWarn&&!ed;
+    const ed=w.enDanger, ew=w.enWarn&&!ed;
     const sc=ed?'#A32D2D':ew?'#854F0B':'#1D9E75';
+    const dateRange=weekDateRange(w.week);
+
     const actions=[];
-    if(ed) actions.push({t:'urgent',m:`EN 庫存僅剩 ${w.enStock} 篇，已低於警戒線。需從待翻排程優先送譯至少 5 篇。`});
-    else if(ew) actions.push({t:'warn',m:`EN 庫存 ${w.enStock} 篇，接近警戒線。建議本週補充翻譯 3 篇以上。`});
-    if(w.transRate<80) actions.push({t:'warn',m:`中英轉譯率 ${w.transRate}%，低於建議值 80%，建議評估增加翻譯資源。`});
-    if(w.enAchieve<80) actions.push({t:'urgent',m:`本週 EN 達成率僅 ${w.enAchieve}%，請確認翻譯卡關原因。`});
-    if(w.cnAchieve>=100&&w.cnReady>15) actions.push({t:'normal',m:`CN 達成率 ${w.cnAchieve}%，庫存充裕，可推進翻譯。`});
-    if(stuck>0) actions.push({t:'warn',m:`共 ${stuck} 篇上架超過 7 天仍未有英文上架日，需追蹤翻譯。`});
+    if(ed) actions.push({t:'urgent',m:`英譯庫存僅剩 ${w.enStock} 篇，已低於警戒線 5 篇。需從待翻排程優先送譯至少 5 篇，避免斷稿。`});
+    else if(ew) actions.push({t:'warn',m:`英譯庫存 ${w.enStock} 篇，接近警戒線。建議本週補充翻譯 3 篇以上。`});
+    if(w.transRate<80) actions.push({t:'warn',m:`中英轉譯率 ${w.transRate}%，低於建議值 80%，中文產出速度超前翻譯，建議評估增加翻譯資源。`});
+    if(w.enAchieve<80) actions.push({t:'urgent',m:`本週英譯稿達成率僅 ${w.enAchieve}%，請確認翻譯卡關原因並調整排程。`});
+    if(w.cnAchieve>=100&&w.cnReady>10) actions.push({t:'normal',m:`中文稿達成率 ${w.cnAchieve}%，審閱庫存充裕（${w.cnReady} 篇），可安排推進翻譯流程。`});
+    if(stuck>0) actions.push({t:'warn',m:`共 ${stuck} 篇中文已上架超過 7 天仍未有英文上架，需追蹤翻譯進度。`});
     if(actions.length===0) actions.push({t:'normal',m:'本週各項指標正常，請維持現有節奏。'});
 
-    const row=(label,hint,cn,en)=>`
-      <div style="display:grid;grid-template-columns:180px 1fr 1fr;border-bottom:1px solid #f1efe8">
-        <div style="padding:12px 16px;display:flex;align-items:center"><div><strong style="display:block;font-size:12px;color:#1a1a1a">${label}</strong>${hint?`<span style="font-size:10px;color:#888780">${hint}</span>`:''}</div></div>
-        <div style="padding:12px 16px;border-left:1px solid #f1efe8;display:flex;align-items:center;gap:8px">${cn}</div>
-        <div style="padding:12px 16px;border-left:1px solid #f1efe8;display:flex;align-items:center;gap:8px">${en}</div>
+    const metricRow=(icon,label,val,valColor,note,noteBg)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f5f5f3">
+        <div style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:#888780">${label}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:20px;font-weight:500;color:${valColor}">${val}</span>
+          ${note?`<span style="font-size:10px;padding:2px 7px;border-radius:6px;background:${noteBg||'#f1efe8'};color:${valColor}">${note}</span>`:''}
+        </div>
       </div>`;
-    const progCell=(act,plan)=>`<div style="flex:1">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:22px;font-weight:500;color:${pCtColor(pct(act,plan))}">${act}</span>
-        <span style="${pCtBadge(pct(act,plan))}">${pct(act,plan)}%</span>
-      </div>
-      ${pgBar(Math.min(100,pct(act,plan)),pCtColor(pct(act,plan)))}
-      <div style="font-size:10px;color:#b4b2a9;margin-top:3px">計畫 ${plan} 篇</div>
-    </div>`;
+
+    const achieveNote=(p)=>p>=100?'達標':p>=80?'接近':'落後';
+    const achieveBg=(p)=>p>=100?'#EAF3DE':p>=80?'#FAEEDA':'#FCEBEB';
 
     return`
-      <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;overflow:hidden;margin-bottom:1rem">
-        <div style="display:grid;grid-template-columns:180px 1fr 1fr;border-bottom:1px solid #e8e8e4">
-          <div style="padding:12px 16px;font-size:12px;font-weight:500;color:#888780"><span style="font-size:10px;color:#b4b2a9;display:block;margin-bottom:2px">${w.week}</span>指標項目</div>
-          <div style="padding:12px 16px;font-size:12px;font-weight:500;background:#E6F1FB;color:#0C447C;border-left:1px solid #e8e8e4"><span style="font-size:10px;font-weight:400;display:block;margin-bottom:2px">中文內容</span>CN 中文稿</div>
-          <div style="padding:12px 16px;font-size:12px;font-weight:500;background:#E1F5EE;color:#085041;border-left:1px solid #e8e8e4"><span style="font-size:10px;font-weight:400;display:block;margin-bottom:2px">英譯內容</span>EN 英譯稿</div>
-        </div>
-        <div style="font-size:10px;color:#888780;padding:5px 16px;background:#fafaf8;border-bottom:1px solid #f1efe8;font-weight:500">本週產出</div>
-        ${row('本週預計上架','週計畫目標',`<span style="font-size:22px;font-weight:500;color:#185FA5">${w.cnPlan}</span><span style="font-size:11px;color:#888780;margin-left:4px">篇</span>`,`<span style="font-size:22px;font-weight:500;color:#1D9E75">${w.enPlan}</span><span style="font-size:11px;color:#888780;margin-left:4px">篇</span>`)}
-        <div style="display:grid;grid-template-columns:180px 1fr 1fr;border-bottom:1px solid #f1efe8">
-          <div style="padding:12px 16px;display:flex;align-items:center"><div><strong style="display:block;font-size:12px;color:#1a1a1a">本週實際上架</strong><span style="font-size:10px;color:#888780">已完成發出</span></div></div>
-          <div style="padding:12px 16px;border-left:1px solid #f1efe8">${progCell(w.cnAct,w.cnPlan)}</div>
-          <div style="padding:12px 16px;border-left:1px solid #f1efe8">${progCell(w.enAct,w.enPlan)}</div>
-        </div>
-        <div style="font-size:10px;color:#888780;padding:5px 16px;background:#fafaf8;border-bottom:1px solid #f1efe8;font-weight:500">累計總量</div>
-        ${row('累計總上架','',`<span style="font-size:22px;font-weight:500;color:#185FA5">${w.cnCum}</span><span style="font-size:10px;color:#888780;margin-left:6px">篇（計畫 ${w.cnPlanCum}）</span>`,`<span style="font-size:22px;font-weight:500;color:#1D9E75">${w.enCum}</span><span style="font-size:10px;color:#888780;margin-left:6px">篇（計畫 ${w.enPlanCum}）</span>`)}
-        <div style="display:grid;grid-template-columns:180px 1fr;border-bottom:1px solid #f1efe8">
-          <div style="padding:12px 16px;display:flex;align-items:center"><div><strong style="display:block;font-size:12px;color:#1a1a1a">中英轉譯率</strong><span style="font-size:10px;color:#888780">EN累計 ÷ CN累計</span></div></div>
-          <div style="padding:12px 16px;border-left:1px solid #f1efe8">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:26px;font-weight:500;color:${tc}">${w.transRate}%</span>
-              <span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;background:${w.transRate>=80?'#EAF3DE':w.transRate>=50?'#FAEEDA':'#FCEBEB'};color:${tc}">${w.transRate>=80?'健康':w.transRate>=50?'偏低':'警告'}</span>
-            </div>
-            ${pgBar(Math.min(100,w.transRate),tc,'8px')}
+      <div style="background:#fff;border:1px solid #e8e8e4;border-radius:14px;overflow:hidden;margin-bottom:1rem">
+
+        <!-- 週標題 -->
+        <div style="padding:14px 18px;background:linear-gradient(90deg,#E6F1FB 0%,#E1F5EE 100%);border-bottom:1px solid #e8e8e4;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-size:13px;font-weight:500;color:#0C447C">${w.week}</span>
+            <span style="font-size:11px;color:#888780;margin-left:8px">${dateRange}</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(24,95,165,0.12);color:#185FA5">中文稿 ${w.cnAchieve}%</span>
+            <span style="font-size:11px;padding:3px 10px;border-radius:10px;background:rgba(29,158,117,0.12);color:#1D9E75">英譯稿 ${w.enAchieve}%</span>
           </div>
         </div>
-        <div style="font-size:10px;color:#888780;padding:5px 16px;background:#fafaf8;border-bottom:1px solid #f1efe8;font-weight:500">庫存水位</div>
-        ${row('目前可用庫存','Ready，隨時可發',`<span style="font-size:22px;font-weight:500;color:#185FA5">${w.cnReady}</span><span style="font-size:11px;color:#888780;margin-left:4px">篇</span>`,`<span style="font-size:22px;font-weight:500;color:${sc}">${w.enStock}</span><span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;margin-left:8px;background:${ed?'#FCEBEB':ew?'#FAEEDA':'#EAF3DE'};color:${sc}">庫存${ed?'危險':ew?'注意':'正常'}</span>`)}
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+
+          <!-- 中文稿區塊 -->
+          <div style="border-right:1px solid #f1efe8">
+            <div style="padding:8px 14px;background:#f9fbff;border-bottom:1px solid #f1efe8">
+              <span style="font-size:11px;font-weight:500;color:#185FA5">中文稿</span>
+            </div>
+            ${metricRow('📤','本週計畫上架',w.cnPlan+'篇','#185FA5',null,null)}
+            ${metricRow('✅','本週實際上架',w.cnAct+'篇',pCtColor(pct(w.cnAct,w.cnPlan)),achieveNote(pct(w.cnAct,w.cnPlan)),achieveBg(pct(w.cnAct,w.cnPlan)))}
+            ${metricRow('📋','預計審閱（Ready）',w.cnReady+'篇','#185FA5',null,null)}
+            ${metricRow('✏️','待編修（Raw）',w.cnRaw+'篇','#888780',null,null)}
+          </div>
+
+          <!-- 英譯稿區塊 -->
+          <div>
+            <div style="padding:8px 14px;background:#f6fcf9;border-bottom:1px solid #f1efe8">
+              <span style="font-size:11px;font-weight:500;color:#1D9E75">英譯稿</span>
+            </div>
+            ${metricRow('📤','本週計畫上架',w.enPlan+'篇','#1D9E75',null,null)}
+            ${metricRow('✅','本週實際上架',w.enAct+'篇',pCtColor(pct(w.enAct,w.enPlan)),achieveNote(pct(w.enAct,w.enPlan)),achieveBg(pct(w.enAct,w.enPlan)))}
+            ${metricRow('📚','已翻譯可上架',w.enStock+'篇',sc,ed?'危險':ew?'注意':'正常',ed?'#FCEBEB':ew?'#FAEEDA':'#EAF3DE')}
+            ${metricRow('⏳','等待翻譯（待翻）',w.enPending+'篇','#534AB7',null,null)}
+          </div>
+        </div>
+
+        <!-- 轉譯率 -->
+        <div style="padding:10px 18px;background:#fafaf8;border-top:1px solid #f1efe8;display:flex;align-items:center;gap:12px">
+          <span style="font-size:11px;color:#888780">中英轉譯率（累計）</span>
+          <div style="flex:1;height:6px;background:#f1efe8;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${Math.min(100,w.transRate)}%;background:${tc};border-radius:3px"></div>
+          </div>
+          <span style="font-size:16px;font-weight:500;color:${tc}">${w.transRate}%</span>
+          <span style="font-size:10px;padding:2px 7px;border-radius:6px;background:${w.transRate>=80?'#EAF3DE':w.transRate>=50?'#FAEEDA':'#FCEBEB'};color:${tc}">${w.transRate>=80?'健康':w.transRate>=50?'偏低':'警告'}</span>
+        </div>
       </div>
+
+      <!-- 行動建議 -->
       <div style="background:#fff;border:1px solid #e8e8e4;border-radius:12px;padding:1.25rem;margin-bottom:12px">
-        <div style="font-size:13px;font-weight:500;margin-bottom:12px">本週行動建議</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:13px;font-weight:500;margin-bottom:10px">本週行動建議</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
           ${actions.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;border:1px solid;${a.t==='urgent'?'background:#FCEBEB;border-color:#F7C1C1':a.t==='warn'?'background:#FAEEDA;border-color:#FAC775':'background:#EAF3DE;border-color:#C0DD97'}">
-            <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px;background:${a.t==='urgent'?'#E24B4A':a.t==='warn'?'#EF9F27':'#639922'}"></div>
+            <div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px;background:${a.t==='urgent'?'#E24B4A':a.t==='warn'?'#EF9F27':'#639922'}"></div>
             <div style="font-size:12px;line-height:1.6;color:${a.t==='urgent'?'#A32D2D':a.t==='warn'?'#854F0B':'#3B6D11'}">${a.m}</div>
           </div>`).join('')}
         </div>
@@ -549,11 +600,21 @@ function renderWeeklySection(weeks,overdue,stuck) {
 
   const selectorHtml=`
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
-      <span style="font-size:12px;color:#888780;margin-right:4px">切換週別</span>
-      ${weeks.map((w,i)=>`<button id="wbtn-${i}" onclick="selectWeekBtn(${i})"
-        style="padding:5px 14px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid #d3d1c7;
-        background:${i===idx?'#185FA5':'#fff'};color:${i===idx?'#fff':'#888780'};font-weight:${i===idx?'500':'400'}"
-        >${w.week}</button>`).join('')}
+      <span style="font-size:12px;color:#888780;margin-right:6px">切換週別</span>
+      ${weeks.map((w,i)=>{
+        const wNum=w.week.replace(FIXED_YEAR+'-','');
+        const dr=weekDateRange(w.week);
+        const isActive=i===idx;
+        return`<button id="wbtn-${i}" onclick="selectWeekBtn(${i})"
+          style="padding:6px 12px;font-size:11px;border-radius:10px;cursor:pointer;
+          border:1px solid ${isActive?'#185FA5':'#e8e8e4'};
+          background:${isActive?'#185FA5':'#fff'};
+          color:${isActive?'#fff':'#888780'};
+          text-align:left;line-height:1.4">
+          <span style="font-weight:500;display:block">${wNum}</span>
+          <span style="font-size:9px;opacity:${isActive?'0.85':'0.7'}">${dr}</span>
+        </button>`;
+      }).join('')}
     </div>`;
 
   const chartHtml=`
@@ -935,7 +996,12 @@ function renderDbStats(){
 
     const themeMeta=document.getElementById('db-theme-meta');
     if(themeMeta) themeMeta.textContent=`${total} 篇中的佔比`;
-    const themeCounts=THEMES.map(t=>base.filter(a=>a.theme&&a.theme.includes(t)).length);
+    const getArr=(a,k)=>{
+      if(!a[k]) return [];
+      if(Array.isArray(a[k])) return a[k];
+      return a[k].split(/[,，、|\/\\]/).map(s=>s.trim()).filter(Boolean);
+    };
+    const themeCounts=THEMES.map(t=>base.filter(a=>getArr(a,'theme').includes(t)).length);
     const themeList=document.getElementById('db-theme-list');
     if(themeList){
       themeList.innerHTML=THEMES.map((t,i)=>`
@@ -954,7 +1020,7 @@ function renderDbStats(){
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} 篇 (${pct(c.raw,total)}%)`}}}}
     });
 
-    const regionCounts=REGIONS.map(r=>base.filter(a=>a.region&&a.region.includes(r)).length);
+    const regionCounts=REGIONS.map(r=>base.filter(a=>getArr(a,'region').includes(r)).length);
     if(dbRegionChart) dbRegionChart.destroy();
     dbRegionChart=new Chart(document.getElementById('db-region-chart').getContext('2d'),{
       type:'bar',
@@ -964,7 +1030,13 @@ function renderDbStats(){
         scales:{x:{grid:{color:'rgba(136,135,128,0.12)'},ticks:{color:'#888780',font:{size:10}}},y:{grid:{display:false},ticks:{color:'#888780',font:{size:11}}}}}
     });
 
-    const seasonCounts=SEASONS.map(s=>base.filter(a=>a.season&&a.season.includes(s)).length);
+    // season 可能存為陣列或以逗號分隔的字串，兩種都支援
+    const getSeason=(a)=>{
+      if(!a.season) return [];
+      if(Array.isArray(a.season)) return a.season;
+      return a.season.split(/[,，、|\/\\]/).map(s=>s.trim()).filter(Boolean);
+    };
+    const seasonCounts=SEASONS.map(s=>base.filter(a=>getSeason(a).includes(s)).length);
     if(dbSeasonChart) dbSeasonChart.destroy();
     dbSeasonChart=new Chart(document.getElementById('db-season-chart').getContext('2d'),{
       type:'bar',
@@ -975,7 +1047,7 @@ function renderDbStats(){
     });
 
     const subdirMap={};
-    base.forEach(a=>{(a.subDir||[]).forEach(s=>{if(s){subdirMap[s]=(subdirMap[s]||0)+1;}});});
+    base.forEach(a=>{getArr(a,'subDir').forEach(s=>{if(s){subdirMap[s]=(subdirMap[s]||0)+1;}});});
     const subdirEntries=Object.entries(subdirMap).sort((a,b)=>b[1]-a[1]);
     const subdirLabels=subdirEntries.map(([k])=>k);
     const subdirVals=subdirEntries.map(([,v])=>v);
