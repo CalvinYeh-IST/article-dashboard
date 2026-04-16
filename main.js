@@ -1200,7 +1200,7 @@ function renderDbStats(){
   const el=document.getElementById('view-dbstats');
   
   // IST 設計色票（三分類）
-  const COLOR_ALL = '#A6885D'; // 沉穩深藍灰（全資料庫）
+  const COLOR_ALL = '#DBCEAF'; // 奶茶咖啡（全資料庫）
   const COLOR_CN  = '#EE833E'; // IST 橘（中文已上架）
   const COLOR_EN  = '#2D2D2D'; // 洗鍊黑灰（英文已上架）
 
