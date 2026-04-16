@@ -1180,213 +1180,202 @@ async function runContentAI(){
   btn.disabled=false;
 }
 
-// ===== 【6】分頁六：資料庫統計視覺化 =====
+// ===== 分頁六：資料庫統計視覺化 =====
 function renderDbStats(){
-  // ★ 重構：dbFilter 提升到外部作用域，確保按鈕切換時能完整連動
-  let dbFilter='all';
-
   const el=document.getElementById('view-dbstats');
+  
+  // 定義圖表顏色
+  const COLOR_ALL = '#E8E8E4'; // 灰色 (全資料庫)
+  const COLOR_CN  = '#EF9F27'; // 橘色 (中文已上架)
+  const COLOR_EN  = '#1A1A1A'; // 黑色 (英文已上架)
+
   el.innerHTML=`
-    <!-- 篩選切換 -->
-    <div style="background:#fff;border:1px solid ${C_EDGE};padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:11px;color:#6B6B6B;font-weight:500;letter-spacing:.04em">資料範圍</span>
-        <button id="db-btn-all" onclick="dbSetFilter('all')"
-          style="padding:6px 18px;font-size:11px;border-radius:2px;cursor:pointer;border:2px solid ${C_ORANGE};background:${C_ORANGE};color:#fff;font-weight:500">
-          全資料庫
-        </button>
-        <button id="db-btn-pub" onclick="dbSetFilter('pub')"
-          style="padding:6px 18px;font-size:11px;border-radius:2px;cursor:pointer;border:2px solid ${C_EDGE};background:#fff;color:#6B6B6B;font-weight:400">
-          已上架
-        </button>
-      </div>
-      <div id="db-total-badge" style="font-size:12px;color:#1C1C1C;font-weight:500"></div>
+    <div style="background:#fff;border:1px solid #e8e8e4;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border-radius:12px">
+      <div style="font-size:13px;color:#1a1a1a;font-weight:500">資料庫統計視覺化</div>
+      <div id="db-total-badge" style="font-size:12px;color:#888780;font-weight:500"></div>
     </div>
 
-    <!-- ★ 群組直條圖：三圖說明 -->
-    <div style="background:#FBF0E8;border:1px solid #EDB896;padding:8px 14px;margin-bottom:1rem;font-size:11px;color:#9C4A12;display:flex;gap:16px;flex-wrap:wrap">
-      <span><span style="display:inline-block;width:12px;height:12px;background:${C_GRAY_FILL};margin-right:5px;vertical-align:middle"></span>全資料庫</span>
-      <span><span style="display:inline-block;width:12px;height:12px;background:#185FA5;margin-right:5px;vertical-align:middle"></span>中文已上架（有 dateZh）</span>
-      <span><span style="display:inline-block;width:12px;height:12px;background:#1D9E75;margin-right:5px;vertical-align:middle"></span>英文已上架（有 dateEn）</span>
+    <div style="background:#fafaf8;border:1px solid #f1efe8;padding:10px 14px;border-radius:8px;margin-bottom:1rem;font-size:11px;color:#888780;display:flex;gap:16px;flex-wrap:wrap">
+      <span><span style="display:inline-block;width:12px;height:12px;background:${COLOR_ALL};margin-right:5px;vertical-align:middle;border-radius:2px"></span>全資料庫</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:${COLOR_CN};margin-right:5px;vertical-align:middle;border-radius:2px"></span>中文已上架（有 dateZh）</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:${COLOR_EN};margin-right:5px;vertical-align:middle;border-radius:2px"></span>英文已上架（有 dateEn）</span>
     </div>
 
-    <!-- 主題探索（全寬，分組直條圖） -->
     <div class="kpi-block" style="margin-bottom:1rem">
-      <div class="kpi-header"><span class="kpi-title">五大主題分布</span><span class="kpi-meta" id="db-theme-meta"></span></div>
+      <div class="kpi-header"><span class="kpi-title">五大主題分布</span><span class="kpi-meta">全資料庫三分類對比</span></div>
       <div class="chart-wrap" style="height:260px"><canvas id="db-theme-chart"></canvas></div>
     </div>
 
-    <!-- 地方探索（全寬） -->
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header"><span class="kpi-title">地方探索分布</span></div>
       <div class="chart-wrap" style="height:240px"><canvas id="db-region-chart"></canvas></div>
     </div>
 
-    <!-- 時令探索（全寬） -->
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header"><span class="kpi-title">時令探索分布</span></div>
       <div class="chart-wrap" style="height:200px"><canvas id="db-season-chart"></canvas></div>
     </div>
 
-    <!-- 子目錄（點擊開啟 Modal） -->
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header">
         <span class="kpi-title">子目錄分布</span>
-        <span class="kpi-meta" id="db-subdir-meta">點擊長條可查看文章列表</span>
+        <span class="kpi-meta" id="db-subdir-meta"></span>
       </div>
       <div class="chart-wrap" id="db-subdir-wrap" style="height:180px"><canvas id="db-subdir-chart"></canvas></div>
     </div>
 
-    <!-- 子目錄明細（點擊卡片開啟 Modal） -->
     <div class="kpi-block">
-      <div class="kpi-header"><span class="kpi-title">子目錄結構明細</span><span class="kpi-meta">點擊可查看文章列表</span></div>
+      <div class="kpi-header"><span class="kpi-title">子目錄結構明細</span><span class="kpi-meta"></span></div>
       <div id="db-subdir-table"></div>
     </div>`;
 
-  // ★ setFilter 提升為外層可存取的函式
-  window.dbSetFilter=function(f){
-    dbFilter=f;
-    const btnAll=document.getElementById('db-btn-all'),btnPub=document.getElementById('db-btn-pub');
-    if(btnAll){btnAll.style.background=f==='all'?C_ORANGE:'#fff';btnAll.style.color=f==='all'?'#fff':'#6B6B6B';btnAll.style.borderColor=f==='all'?C_ORANGE:C_EDGE;btnAll.style.fontWeight=f==='all'?'500':'400';}
-    if(btnPub){btnPub.style.background=f==='pub'?'#1A6B45':'#fff';btnPub.style.color=f==='pub'?'#fff':'#6B6B6B';btnPub.style.borderColor=f==='pub'?'#1A6B45':C_EDGE;btnPub.style.fontWeight=f==='pub'?'500':'400';}
-    updateDbCharts();
-  };
-
-  /** ★ 通用群組直條圖產生器（三分類：全庫/中文上架/英文上架） */
-  function makeGroupedChart(canvasId,labels,allData){
-    const cnData=[];const enData=[];
+  /** ★ 通用群組直條圖產生器 */
+  function makeGroupedChart(labels, allData){
+    const cnData=[]; const enData=[];
     labels.forEach((_,i)=>{
-      // allData[i] = 全資料庫（基準），從 contentArticles 重新計算中英上架數
       cnData.push(allData[i].cn);
       enData.push(allData[i].en);
     });
-    return{
+    return {
       type:'bar',
       data:{
         labels,
         datasets:[
-          {label:'全資料庫',data:allData.map(d=>d.total),backgroundColor:C_GRAY_FILL,borderWidth:0},
-          {label:'中文已上架',data:cnData,backgroundColor:'#185FA5',borderWidth:0},
-          {label:'英文已上架',data:enData,backgroundColor:'#1D9E75',borderWidth:0},
+          {label:'全資料庫', data:allData.map(d=>d.total), backgroundColor:COLOR_ALL, borderWidth:0},
+          {label:'中文已上架', data:cnData, backgroundColor:COLOR_CN, borderWidth:0},
+          {label:'英文已上架', data:enData, backgroundColor:COLOR_EN, borderWidth:0},
         ]
       },
       options:{
-        responsive:true,maintainAspectRatio:false,
+        responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{display:true,position:'top',
-            labels:{font:{size:10},color:'#6B6B6B',boxWidth:14,padding:10}},
-          tooltip:{mode:'index',intersect:false,
-            callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}}
+          legend:{display:false}, // 已在 HTML 自訂說明
+          tooltip:{mode:'index', intersect:false, callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}}
         },
         scales:{
-          x:{grid:{display:false},ticks:{color:'#9A9A96',font:{size:11}}},
-          y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#9A9A96',font:{size:10}},min:0,
-             title:{display:true,text:'篇數',color:'#9A9A96',font:{size:10}}}
+          x:{grid:{display:false}, ticks:{color:'#888780',font:{size:11}}},
+          y:{grid:{color:'rgba(136,135,128,0.12)'}, ticks:{color:'#888780',font:{size:10}}, min:0}
         }
       }
     };
   }
 
   function updateDbCharts(){
-    // base = 當前篩選的文章集（影響 badge 顯示，但圖表永遠同時顯示三分類）
-    const base=dbFilter==='pub'?contentArticles.filter(a=>a.dateZh):contentArticles;
-    const allArts=contentArticles; // 永遠用全資料庫計算三分類
-    const total=base.length;
+    const allArts = contentArticles;
+    const total = allArts.length;
 
-    const badge=document.getElementById('db-total-badge');
-    if(badge) badge.textContent=dbFilter==='pub'?`已上架：${total} 篇（有 dateZh）`:`全資料庫：${total} 篇`;
-    const themeMeta=document.getElementById('db-theme-meta');
-    if(themeMeta) themeMeta.textContent=dbFilter==='pub'?`顯示已上架 ${total} 篇的三分類分布`:`全資料庫 ${total} 篇的三分類分布`;
+    const badge = document.getElementById('db-total-badge');
+    if(badge) badge.textContent = `共 ${total} 篇`;
 
-    // 依 dbFilter 決定計算基準（已上架模式下只看 base 文章）
-    const calcBase=base; // 用 base 做三分類計算（確保切換時所有圖表一起更新）
+    const getArr = (a, k) => {
+      if(!a[k]) return [];
+      if(Array.isArray(a[k])) return a[k];
+      return a[k].split(/[,，、|\/\\]/).map(s=>s.trim()).filter(Boolean);
+    };
 
-    // ★ 主題探索（群組直條圖）
-    const themeData=THEMES.map(t=>({
-      total:calcBase.filter(a=>getArr(a,'theme').includes(t)).length,
-      cn:calcBase.filter(a=>getArr(a,'theme').includes(t)&&a.dateZh).length,
-      en:calcBase.filter(a=>getArr(a,'theme').includes(t)&&a.dateEn).length,
+    // ★ 關鍵修正：使用 .some 搭配 .includes，解決「春」跟「春天/春季」的模糊比對問題
+    const match = (a, k, val) => getArr(a, k).some(v => v.includes(val));
+
+    // 主題探索
+    const themeData = THEMES.map(t=>({
+      total: allArts.filter(a=>match(a,'theme',t)).length,
+      cn:    allArts.filter(a=>match(a,'theme',t) && a.dateZh).length,
+      en:    allArts.filter(a=>match(a,'theme',t) && a.dateEn).length,
     }));
     if(dbThemeChart) dbThemeChart.destroy();
-    dbThemeChart=new Chart(document.getElementById('db-theme-chart').getContext('2d'),
-      makeGroupedChart('db-theme-chart',THEMES,themeData));
+    dbThemeChart = new Chart(document.getElementById('db-theme-chart').getContext('2d'), makeGroupedChart(THEMES, themeData));
 
-    // ★ 地方探索（群組直條圖）
-    const regionData=REGIONS.map(r=>({
-      total:calcBase.filter(a=>getArr(a,'region').includes(r)).length,
-      cn:calcBase.filter(a=>getArr(a,'region').includes(r)&&a.dateZh).length,
-      en:calcBase.filter(a=>getArr(a,'region').includes(r)&&a.dateEn).length,
+    // 地方探索
+    const regionData = REGIONS.map(r=>({
+      total: allArts.filter(a=>match(a,'region',r)).length,
+      cn:    allArts.filter(a=>match(a,'region',r) && a.dateZh).length,
+      en:    allArts.filter(a=>match(a,'region',r) && a.dateEn).length,
     }));
     if(dbRegionChart) dbRegionChart.destroy();
-    dbRegionChart=new Chart(document.getElementById('db-region-chart').getContext('2d'),
-      makeGroupedChart('db-region-chart',REGIONS,regionData));
+    dbRegionChart = new Chart(document.getElementById('db-region-chart').getContext('2d'), makeGroupedChart(REGIONS, regionData));
 
-    // ★ 時令探索（群組直條圖）
-    const seasonData=SEASONS.map(s=>({
-      total:calcBase.filter(a=>getArr(a,'season').includes(s)).length,
-      cn:calcBase.filter(a=>getArr(a,'season').includes(s)&&a.dateZh).length,
-      en:calcBase.filter(a=>getArr(a,'season').includes(s)&&a.dateEn).length,
+    // 時令探索
+    const seasonData = SEASONS.map(s=>({
+      total: allArts.filter(a=>match(a,'season',s)).length,
+      cn:    allArts.filter(a=>match(a,'season',s) && a.dateZh).length,
+      en:    allArts.filter(a=>match(a,'season',s) && a.dateEn).length,
     }));
     if(dbSeasonChart) dbSeasonChart.destroy();
-    dbSeasonChart=new Chart(document.getElementById('db-season-chart').getContext('2d'),
-      makeGroupedChart('db-season-chart',SEASONS,seasonData));
+    dbSeasonChart = new Chart(document.getElementById('db-season-chart').getContext('2d'), makeGroupedChart(SEASONS, seasonData));
 
-    // ★ 子目錄（單色橫條圖 + onClick 開啟 Modal）
+    // 子目錄
     const subdirMap={};
-    calcBase.forEach(a=>getArr(a,'subDir').forEach(s=>{if(s) subdirMap[s]=(subdirMap[s]||0)+1;}));
-    const subdirEntries=Object.entries(subdirMap).sort((a,b)=>b[1]-a[1]);
-    const subdirLabels=subdirEntries.map(([k])=>k);
-    const subdirVals=subdirEntries.map(([,v])=>v);
-    const subdirMeta=document.getElementById('db-subdir-meta');
-    if(subdirMeta) subdirMeta.textContent=`共 ${subdirLabels.length} 個子目錄 · 點擊長條查看文章`;
-    const chartH=Math.max(180,subdirLabels.length*28+60);
-    const wrapEl=document.getElementById('db-subdir-wrap');
-    if(wrapEl) wrapEl.style.height=chartH+'px';
-    if(dbSubdirChart) dbSubdirChart.destroy();
-    if(subdirLabels.length>0){
-      dbSubdirChart=new Chart(document.getElementById('db-subdir-chart').getContext('2d'),{
-        type:'bar',
-        data:{labels:subdirLabels,datasets:[{
-          data:subdirVals,backgroundColor:'#7F77DD',borderWidth:0,
-          hoverBackgroundColor:'#534AB7',
-        }]},
-        options:{
-          indexAxis:'y',responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},
-            tooltip:{callbacks:{label:c=>`${c.raw} 篇 (${pct(c.raw,total)}%)`}}},
-          scales:{
-            x:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#9A9A96',font:{size:10}}},
-            y:{grid:{display:false},ticks:{color:'#6B6B6B',font:{size:10}}}
-          },
-          // ★ 點擊長條開啟子目錄 Modal
-          onClick:(_,elements)=>{
-            if(elements.length>0){
-              const label=subdirLabels[elements[0].index];
-              openSubdirModal(label,calcBase);
+    allArts.forEach(a=>{
+        getArr(a,'subDir').forEach(s=>{
+            if(s){
+                if(!subdirMap[s]) subdirMap[s] = {total:0, cn:0, en:0};
+                subdirMap[s].total++;
+                if(a.dateZh) subdirMap[s].cn++;
+                if(a.dateEn) subdirMap[s].en++;
             }
+        });
+    });
+    const subdirEntries = Object.entries(subdirMap).sort((a,b)=>b[1].total - a[1].total);
+    const subdirLabels = subdirEntries.map(([k])=>k);
+    const subdirData = subdirEntries.map(([,v])=>v);
+
+    const subdirMeta = document.getElementById('db-subdir-meta');
+    if(subdirMeta) subdirMeta.textContent = `共 ${subdirLabels.length} 個子目錄`;
+    
+    const chartH = Math.max(180, subdirLabels.length * 30 + 60);
+    const wrap = document.getElementById('db-subdir-wrap');
+    if(wrap) wrap.style.height = chartH + 'px';
+
+    if(dbSubdirChart) dbSubdirChart.destroy();
+    if(subdirLabels.length > 0){
+      dbSubdirChart = new Chart(document.getElementById('db-subdir-chart').getContext('2d'), {
+        type:'bar',
+        data:{
+          labels: subdirLabels,
+          datasets:[
+            {label:'全資料庫', data:subdirData.map(d=>d.total), backgroundColor:COLOR_ALL, borderWidth:0},
+            {label:'中文已上架', data:subdirData.map(d=>d.cn), backgroundColor:COLOR_CN, borderWidth:0},
+            {label:'英文已上架', data:subdirData.map(d=>d.en), backgroundColor:COLOR_EN, borderWidth:0},
+          ]
+        },
+        options:{
+          indexAxis:'y', responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{display:false},
+            tooltip:{mode:'index', intersect:false, callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}}
+          },
+          scales:{
+            x:{grid:{color:'rgba(136,135,128,0.12)'}, ticks:{color:'#888780',font:{size:10}}},
+            y:{grid:{display:false}, ticks:{color:'#888780',font:{size:10}}}
           }
         }
       });
+    } else {
+      const ctx = document.getElementById('db-subdir-chart').getContext('2d');
+      ctx.font = '12px sans-serif'; ctx.fillStyle = '#b4b2a9'; ctx.textAlign = 'center';
+      ctx.fillText('尚無子目錄資料', ctx.canvas.width/2, 50);
     }
 
-    // ★ 子目錄明細表（點擊開啟 Modal）
-    const subdirTable=document.getElementById('db-subdir-table');
-    if(subdirTable&&subdirEntries.length>0){
-      subdirTable.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">
-        ${subdirEntries.map(([name,count])=>`
-          <div onclick="openSubdirModal('${name.replace(/'/g,"\\'")}', null)"
-            style="padding:.75rem;background:${C_BG};border:1px solid ${C_EDGE};display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all .15s"
-            onmouseover="this.style.background='#FBF0E8';this.style.borderColor='#EDB896'"
-            onmouseout="this.style.background='${C_BG}';this.style.borderColor='${C_EDGE}'">
-            <div style="font-size:12px;color:#1C1C1C">${name}</div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:13px;font-weight:500;color:#534AB7">${count}</span>
-              <span style="font-size:10px;color:#6B6B6B">${pct(count,total)}%</span>
+    // 子目錄明細表
+    const subdirTable = document.getElementById('db-subdir-table');
+    if(subdirTable && subdirEntries.length > 0){
+      subdirTable.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+        ${subdirEntries.map(([name, counts])=>`
+          <div style="padding:.875rem;background:#f9f9f7;border-radius:8px;border:1px solid #f1efe8">
+            <div style="font-size:12px;color:#1a1a1a;margin-bottom:6px;font-weight:500">${name}</div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780;margin-bottom:3px">
+              <span>全庫</span><span style="color:#1a1a1a;font-weight:500">${counts.total}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780;margin-bottom:3px">
+              <span>中文</span><span style="color:${COLOR_CN};font-weight:500">${counts.cn}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780">
+              <span>英文</span><span style="color:${COLOR_EN};font-weight:500">${counts.en}</span>
             </div>
           </div>`).join('')}
       </div>`;
     } else if(subdirTable){
-      subdirTable.innerHTML=`<div style="text-align:center;padding:1.5rem;font-size:12px;color:#9A9A96">尚無子目錄資料，請填入 Excel 子目錄欄位後執行 sync_content.py</div>`;
+      subdirTable.innerHTML='<div style="text-align:center;padding:1.5rem;font-size:12px;color:#b4b2a9">尚無子目錄資料</div>';
     }
   }
 
