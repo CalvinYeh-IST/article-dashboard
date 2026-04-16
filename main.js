@@ -1181,42 +1181,52 @@ async function runContentAI(){
 }
 
 // ===== 【6】分頁六：資料庫統計視覺化 =====
+// ===== 【6】分頁六：資料庫統計視覺化 =====
 function renderDbStats(){
   const el=document.getElementById('view-dbstats');
-  
-  // ★ 需求3：重新調配專業、對比適中的色彩
-  const COLOR_ALL = '#4A5568'; // 沉穩深藍灰 (全資料庫)
-  const COLOR_CN  = '#E67E22'; // 專業橘色 (中文已上架)
-  const COLOR_EN  = '#2D3748'; // 洗鍊黑灰色 (英文已上架)
 
-  // ★ 需求1：移除按鈕，直接顯示單一視角
+  // ── IST 品牌延伸色票（沉穩、對比柔和）
+  // 全資料庫 → 暖灰（基準線，不搶眼）
+  // 中文已上架 → IST 橘（品牌主色，中文稿識別）
+  // 英文已上架 → 深藍灰（沉穩專業，和橘色形成低對比協調）
+  const COLOR_ALL = '#B4B2A9'; // 暖灰：品牌灰系，代表「全體基準」
+  const COLOR_CN  = '#C8621E'; // IST 橘：中文稿主色，與品牌一致
+  const COLOR_EN  = '#5B7A9E'; // 低飽和藍：英譯稿，專業、不刺眼
+
   el.innerHTML=`
     <div style="background:#fff;border:1px solid ${C_EDGE};padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div style="font-size:13px;color:#1C1C1C;font-weight:500;letter-spacing:.04em">資料庫統計視覺化</div>
-      <div id="db-total-badge" style="font-size:12px;color:#6B6B6B;font-weight:500"></div>
+      <div id="db-total-badge" style="font-size:12px;color:#6B6B6B;font-weight:400"></div>
     </div>
- 
-    <div style="background:${C_BG};border:1px solid ${C_EDGE};padding:10px 14px;border-radius:4px;margin-bottom:1rem;font-size:11px;color:#6B6B6B;display:flex;gap:16px;flex-wrap:wrap">
-      <span><span style="display:inline-block;width:12px;height:12px;background:${COLOR_ALL};margin-right:5px;vertical-align:middle;border-radius:2px"></span>全資料庫（所有有資料的文章）</span>
-      <span><span style="display:inline-block;width:12px;height:12px;background:${COLOR_CN};margin-right:5px;vertical-align:middle;border-radius:2px"></span>中文已上架（有 dateZh）</span>
-      <span><span style="display:inline-block;width:12px;height:12px;background:${COLOR_EN};margin-right:5px;vertical-align:middle;border-radius:2px"></span>英文已上架（有 dateEn）</span>
+
+    <!-- 圖例說明 -->
+    <div style="background:${C_BG};border:1px solid ${C_EDGE};padding:10px 16px;margin-bottom:1rem;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:10px;color:#6B6B6B;letter-spacing:.03em;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:14px;height:10px;background:${COLOR_ALL};border-radius:1px"></span>全資料庫（所有有資料的文章）
+      </span>
+      <span style="font-size:10px;color:#6B6B6B;letter-spacing:.03em;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:14px;height:10px;background:${COLOR_CN};border-radius:1px"></span>中文已上架（有中文上架日期）
+      </span>
+      <span style="font-size:10px;color:#6B6B6B;letter-spacing:.03em;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:14px;height:10px;background:${COLOR_EN};border-radius:1px"></span>英文已上架（有英文上架日期）
+      </span>
     </div>
- 
+
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header"><span class="kpi-title">五大主題分布</span></div>
       <div class="chart-wrap" style="height:260px"><canvas id="db-theme-chart"></canvas></div>
     </div>
- 
+
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header"><span class="kpi-title">地方探索分布</span></div>
       <div class="chart-wrap" style="height:240px"><canvas id="db-region-chart"></canvas></div>
     </div>
- 
+
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header"><span class="kpi-title">時令探索分布</span></div>
       <div class="chart-wrap" style="height:200px"><canvas id="db-season-chart"></canvas></div>
     </div>
- 
+
     <div class="kpi-block" style="margin-bottom:1rem">
       <div class="kpi-header">
         <span class="kpi-title">子目錄分布</span>
@@ -1224,112 +1234,123 @@ function renderDbStats(){
       </div>
       <div class="chart-wrap" id="db-subdir-wrap" style="height:180px"><canvas id="db-subdir-chart"></canvas></div>
     </div>
- 
+
     <div class="kpi-block">
-      <div class="kpi-header"><span class="kpi-title">子目錄結構明細</span><span class="kpi-meta">點擊可查看文章列表</span></div>
+      <div class="kpi-header">
+        <span class="kpi-title">子目錄結構明細</span>
+        <span class="kpi-meta">點擊卡片可查看文章列表</span>
+      </div>
       <div id="db-subdir-table"></div>
     </div>`;
- 
-  /** ★ 通用群組直條圖產生器 */
-  function makeGroupedChart(canvasId,labels,allData){
-    const cnData=[];const enData=[];
-    labels.forEach((_,i)=>{
-      cnData.push(allData[i].cn);
-      enData.push(allData[i].en);
-    });
+
+  // ── 取陣列欄位（Array 或逗號字串皆支援）
+  const safeArr=(a,k)=>{
+    if(!a[k]) return [];
+    if(Array.isArray(a[k])) return a[k];
+    return a[k].split(/[,，、|/\\]/).map(s=>s.trim()).filter(Boolean);
+  };
+
+  // ── 通用群組直條圖（三分類：全庫 / 中文已上架 / 英文已上架）
+  function makeGroupedChart(labels,data){
     return{
       type:'bar',
       data:{
         labels,
         datasets:[
-          {label:'全資料庫',data:allData.map(d=>d.total),backgroundColor:COLOR_ALL,borderWidth:0},
-          {label:'中文已上架',data:cnData,backgroundColor:COLOR_CN,borderWidth:0},
-          {label:'英文已上架',data:enData,backgroundColor:COLOR_EN,borderWidth:0},
+          {label:'全資料庫',   data:data.map(d=>d.total), backgroundColor:COLOR_ALL, borderWidth:0, borderRadius:2},
+          {label:'中文已上架', data:data.map(d=>d.cn),    backgroundColor:COLOR_CN,  borderWidth:0, borderRadius:2},
+          {label:'英文已上架', data:data.map(d=>d.en),    backgroundColor:COLOR_EN,  borderWidth:0, borderRadius:2},
         ]
       },
       options:{
-        responsive:true,maintainAspectRatio:false,
+        responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{display:false}, // 已在 HTML 自訂說明
-          tooltip:{mode:'index',intersect:false,
-            callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}}
+          legend:{display:false}, // 使用 HTML 自訂圖例，避免 Chart.js 圖例過大
+          tooltip:{
+            mode:'index', intersect:false,
+            backgroundColor:'#1C1C1C', titleColor:'#fff', bodyColor:'rgba(255,255,255,0.75)',
+            cornerRadius:0, padding:10,
+            callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}
+          }
         },
         scales:{
-          x:{grid:{display:false},ticks:{color:'#9A9A96',font:{size:11}}},
-          y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#9A9A96',font:{size:10}},min:0,
-             title:{display:true,text:'篇數',color:'#9A9A96',font:{size:10}}}
+          x:{grid:{display:false}, ticks:{color:'#9A9A96',font:{size:11}}},
+          y:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#9A9A96',font:{size:10}},
+             min:0, title:{display:true,text:'篇數',color:'#9A9A96',font:{size:10}}}
         }
       }
     };
   }
- 
-  function updateDbCharts(){
-    const allArts = contentArticles; 
-    const total = allArts.length;
- 
-    const badge=document.getElementById('db-total-badge');
-    if(badge) badge.textContent=`總計 ${total} 篇`;
- 
-    // ★ 安全獲取陣列的輔助函式
-    const getArr = (a, k) => {
-      if(!a[k]) return [];
-      if(Array.isArray(a[k])) return a[k];
-      return a[k].split(/[,，、|\/\\]/).map(s=>s.trim()).filter(Boolean);
-    };
 
-    // ★ 需求2關鍵修正：包含比對 (例如 "春" 可以比對到 "春天")
-    const match = (a, k, val) => getArr(a, k).some(v => v.includes(val));
- 
-    // 主題探索
+  function updateDbCharts(){
+    // ── 資料真理：
+    //   全資料庫 = contentArticles 的所有文章
+    //   中文已上架 = 有 dateZh 欄位（中文上架日期）
+    //   英文已上架 = 有 dateEn 欄位（英文上架日期）
+    const allArts = contentArticles;
+    const total   = allArts.length;
+
+    const badge=document.getElementById('db-total-badge');
+    if(badge) badge.textContent=`內容資料庫共 ${total} 篇`;
+
+    // ── 五大主題
     const themeData=THEMES.map(t=>({
-      total:allArts.filter(a=>match(a,'theme',t)).length,
-      cn:allArts.filter(a=>match(a,'theme',t)&&a.dateZh).length,
-      en:allArts.filter(a=>match(a,'theme',t)&&a.dateEn).length,
+      total: allArts.filter(a=> safeArr(a,'theme').includes(t)).length,
+      cn:    allArts.filter(a=> safeArr(a,'theme').includes(t) && !!a.dateZh).length,
+      en:    allArts.filter(a=> safeArr(a,'theme').includes(t) && !!a.dateEn).length,
     }));
     if(dbThemeChart) dbThemeChart.destroy();
-    dbThemeChart=new Chart(document.getElementById('db-theme-chart').getContext('2d'),
-      makeGroupedChart('db-theme-chart',THEMES,themeData));
- 
-    // 地方探索
+    dbThemeChart=new Chart(
+      document.getElementById('db-theme-chart').getContext('2d'),
+      makeGroupedChart(THEMES, themeData)
+    );
+
+    // ── 地方探索
     const regionData=REGIONS.map(r=>({
-      total:allArts.filter(a=>match(a,'region',r)).length,
-      cn:allArts.filter(a=>match(a,'region',r)&&a.dateZh).length,
-      en:allArts.filter(a=>match(a,'region',r)&&a.dateEn).length,
+      total: allArts.filter(a=> safeArr(a,'region').includes(r)).length,
+      cn:    allArts.filter(a=> safeArr(a,'region').includes(r) && !!a.dateZh).length,
+      en:    allArts.filter(a=> safeArr(a,'region').includes(r) && !!a.dateEn).length,
     }));
     if(dbRegionChart) dbRegionChart.destroy();
-    dbRegionChart=new Chart(document.getElementById('db-region-chart').getContext('2d'),
-      makeGroupedChart('db-region-chart',REGIONS,regionData));
- 
-    // 時令探索
+    dbRegionChart=new Chart(
+      document.getElementById('db-region-chart').getContext('2d'),
+      makeGroupedChart(REGIONS, regionData)
+    );
+
+    // ── 時令探索
     const seasonData=SEASONS.map(s=>({
-      total:allArts.filter(a=>match(a,'season',s)).length,
-      cn:allArts.filter(a=>match(a,'season',s)&&a.dateZh).length,
-      en:allArts.filter(a=>match(a,'season',s)&&a.dateEn).length,
+      total: allArts.filter(a=> safeArr(a,'season').includes(s)).length,
+      cn:    allArts.filter(a=> safeArr(a,'season').includes(s) && !!a.dateZh).length,
+      en:    allArts.filter(a=> safeArr(a,'season').includes(s) && !!a.dateEn).length,
     }));
     if(dbSeasonChart) dbSeasonChart.destroy();
-    dbSeasonChart=new Chart(document.getElementById('db-season-chart').getContext('2d'),
-      makeGroupedChart('db-season-chart',SEASONS,seasonData));
- 
-    // ★ 子目錄保留原互動：包含 hover 色彩、點擊事件
+    dbSeasonChart=new Chart(
+      document.getElementById('db-season-chart').getContext('2d'),
+      makeGroupedChart(SEASONS, seasonData)
+    );
+
+    // ── 子目錄（橫向群組直條圖 + 點擊開啟 Modal）
     const subdirMap={};
     allArts.forEach(a=>{
-      getArr(a,'subDir').forEach(s=>{
-        if(s){
-          if(!subdirMap[s]) subdirMap[s]={total:0, cn:0, en:0};
-          subdirMap[s].total++;
-          if(a.dateZh) subdirMap[s].cn++;
-          if(a.dateEn) subdirMap[s].en++;
-        }
+      safeArr(a,'subDir').forEach(s=>{
+        if(!s) return;
+        if(!subdirMap[s]) subdirMap[s]={total:0,cn:0,en:0};
+        subdirMap[s].total++;
+        if(a.dateZh) subdirMap[s].cn++;
+        if(a.dateEn) subdirMap[s].en++;
       });
     });
-    const subdirEntries=Object.entries(subdirMap).sort((a,b)=>b[1].total - a[1].total);
+    const subdirEntries=Object.entries(subdirMap).sort((a,b)=>b[1].total-a[1].total);
     const subdirLabels=subdirEntries.map(([k])=>k);
-    const subdirData=subdirEntries.map(([,v])=>v);
+    const subdirData  =subdirEntries.map(([,v])=>v);
+
     const subdirMeta=document.getElementById('db-subdir-meta');
     if(subdirMeta) subdirMeta.textContent=`共 ${subdirLabels.length} 個子目錄 · 點擊長條查看文章`;
-    const chartH=Math.max(180,subdirLabels.length*35+60);
+
+    const chartH=Math.max(180, subdirLabels.length*35+60);
     const wrapEl=document.getElementById('db-subdir-wrap');
     if(wrapEl) wrapEl.style.height=chartH+'px';
+
     if(dbSubdirChart) dbSubdirChart.destroy();
     if(subdirLabels.length>0){
       dbSubdirChart=new Chart(document.getElementById('db-subdir-chart').getContext('2d'),{
@@ -1337,22 +1358,25 @@ function renderDbStats(){
         data:{
           labels:subdirLabels,
           datasets:[
-            {label:'全資料庫',data:subdirData.map(d=>d.total),backgroundColor:COLOR_ALL,borderWidth:0},
-            {label:'中文已上架',data:subdirData.map(d=>d.cn),backgroundColor:COLOR_CN,borderWidth:0},
-            {label:'英文已上架',data:subdirData.map(d=>d.en),backgroundColor:COLOR_EN,borderWidth:0},
+            {label:'全資料庫',   data:subdirData.map(d=>d.total), backgroundColor:COLOR_ALL, borderWidth:0, borderRadius:2},
+            {label:'中文已上架', data:subdirData.map(d=>d.cn),    backgroundColor:COLOR_CN,  borderWidth:0, borderRadius:2},
+            {label:'英文已上架', data:subdirData.map(d=>d.en),    backgroundColor:COLOR_EN,  borderWidth:0, borderRadius:2},
           ]
         },
         options:{
-          indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          indexAxis:'y', responsive:true, maintainAspectRatio:false,
           plugins:{
             legend:{display:false},
-            tooltip:{mode:'index',intersect:false,callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}}
+            tooltip:{mode:'index', intersect:false,
+              backgroundColor:'#1C1C1C',titleColor:'#fff',bodyColor:'rgba(255,255,255,0.75)',
+              cornerRadius:0,padding:10,
+              callbacks:{label:c=>` ${c.dataset.label}：${c.raw} 篇`}}
           },
           scales:{
-            x:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#9A9A96',font:{size:10}}},
-            y:{grid:{display:false},ticks:{color:'#6B6B6B',font:{size:11}}}
+            x:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#9A9A96',font:{size:10}}},
+            y:{grid:{display:false}, ticks:{color:'#6B6B6B',font:{size:11}}}
           },
-          // ★ 完美保留原本的互動點擊事件
+          // 點擊長條 → 開啟該子目錄的文章 Modal
           onClick:(_,elements)=>{
             if(elements.length>0){
               const label=subdirLabels[elements[0].index];
@@ -1361,65 +1385,80 @@ function renderDbStats(){
           }
         }
       });
+    } else {
+      const ctx=document.getElementById('db-subdir-chart').getContext('2d');
+      ctx.font='12px sans-serif';ctx.fillStyle='#B4B2A9';ctx.textAlign='center';
+      ctx.fillText('尚無子目錄資料',ctx.canvas.width/2,50);
     }
- 
-    // ★ 子目錄明細表（點擊開啟 Modal，並顯示三種數據）
+
+    // ── 子目錄明細卡片（點擊開啟 Modal，顯示三項數據）
     const subdirTable=document.getElementById('db-subdir-table');
-    if(subdirTable&&subdirEntries.length>0){
-      subdirTable.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
-        ${subdirEntries.map(([name,counts])=>`
-          <div onclick="openSubdirModal('${name.replace(/'/g,"\\'")}', null)"
-            style="padding:.875rem;background:${C_BG};border:1px solid ${C_EDGE};cursor:pointer;transition:all .15s"
-            onmouseover="this.style.background='#FBF0E8';this.style.borderColor='#EDB896'"
-            onmouseout="this.style.background='${C_BG}';this.style.borderColor='${C_EDGE}'">
-            <div style="font-size:12px;color:#1C1C1C;margin-bottom:8px;font-weight:500">${name}</div>
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780;margin-bottom:4px">
-              <span>全資料庫</span><span style="color:${COLOR_ALL};font-weight:500">${counts.total}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780;margin-bottom:4px">
-              <span>中文已上架</span><span style="color:${COLOR_CN};font-weight:500">${counts.cn}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780">
-              <span>英文已上架</span><span style="color:${COLOR_EN};font-weight:500">${counts.en}</span>
-            </div>
-          </div>`).join('')}
-      </div>`;
+    if(subdirTable && subdirEntries.length>0){
+      subdirTable.innerHTML=`
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
+          ${subdirEntries.map(([name,counts])=>`
+            <div onclick="openSubdirModal('${name.replace(/'/g,"\\'")}', null)"
+              style="padding:.875rem;background:${C_BG};border:1px solid ${C_EDGE};cursor:pointer;transition:border-color .15s"
+              onmouseover="this.style.borderColor='#EDB896';this.style.background='#FBF0E8'"
+              onmouseout="this.style.borderColor='${C_EDGE}';this.style.background='${C_BG}'">
+              <div style="font-size:12px;color:#1C1C1C;font-weight:500;margin-bottom:10px">${name}</div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-size:10px;color:#9A9A96;display:flex;align-items:center;gap:5px">
+                    <span style="width:8px;height:8px;background:${COLOR_ALL};border-radius:1px;display:inline-block"></span>全資料庫
+                  </span>
+                  <span style="font-size:12px;font-weight:500;color:${COLOR_ALL}">${counts.total}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-size:10px;color:#9A9A96;display:flex;align-items:center;gap:5px">
+                    <span style="width:8px;height:8px;background:${COLOR_CN};border-radius:1px;display:inline-block"></span>中文已上架
+                  </span>
+                  <span style="font-size:12px;font-weight:500;color:${COLOR_CN}">${counts.cn}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-size:10px;color:#9A9A96;display:flex;align-items:center;gap:5px">
+                    <span style="width:8px;height:8px;background:${COLOR_EN};border-radius:1px;display:inline-block"></span>英文已上架
+                  </span>
+                  <span style="font-size:12px;font-weight:500;color:${COLOR_EN}">${counts.en}</span>
+                </div>
+              </div>
+            </div>`).join('')}
+        </div>`;
     } else if(subdirTable){
       subdirTable.innerHTML=`<div style="text-align:center;padding:1.5rem;font-size:12px;color:#9A9A96">尚無子目錄資料，請填入 Excel 子目錄欄位後執行 sync_content.py</div>`;
     }
   }
- 
+
   updateDbCharts();
 }
- 
-/**
- * ★ 子目錄 Popup Modal（完美保留）
- */
-function openSubdirModal(subdirName,base){
-  const pool=base||contentArticles;
-  
-  // ★ 使用與上方相同的輔助函數確保比對正確
-  const getArr = (a, k) => {
+
+// ── 子目錄 Popup Modal（使用 makeCard 風格）
+function openSubdirModal(subdirName, base){
+  const pool = base || contentArticles;
+  const safeArr = (a,k) => {
     if(!a[k]) return [];
     if(Array.isArray(a[k])) return a[k];
-    return a[k].split(/[,，、|\/\\]/).map(s=>s.trim()).filter(Boolean);
+    return a[k].split(/[,，、|/\\]/).map(s=>s.trim()).filter(Boolean);
   };
-  const arts=pool.filter(a=>getArr(a,'subDir').some(v => v.includes(subdirName)));
-  
-  const overlay=document.createElement('div');
-  overlay.id='subdir-modal-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto';
-  overlay.onclick=e=>{if(e.target===overlay) {overlay.remove();document.body.style.overflow='';}};
+  // 精確比對子目錄名稱
+  const arts = pool.filter(a => safeArr(a,'subDir').includes(subdirName));
+
+  const overlay = document.createElement('div');
+  overlay.id = 'subdir-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto';
+  overlay.onclick = e => {
+    if(e.target === overlay){ overlay.remove(); document.body.style.overflow=''; }
+  };
   overlay.innerHTML=`
     <div style="background:#fff;width:100%;max-width:900px;box-shadow:0 24px 64px rgba(0,0,0,0.18)">
       <div style="padding:20px 24px 16px;border-bottom:2px solid ${C_ORANGE};display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1">
         <div>
-          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${C_ORANGE};margin-bottom:3px">子目錄文章清單</div>
+          <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:${C_ORANGE};margin-bottom:3px">子目錄文章清單</div>
           <h2 style="font-size:18px;font-weight:500;color:#1C1C1C;margin:0">${subdirName}</h2>
           <div style="font-size:11px;color:#9A9A96;margin-top:3px">共 ${arts.length} 篇文章</div>
         </div>
         <button onclick="document.getElementById('subdir-modal-overlay').remove();document.body.style.overflow=''"
-          style="width:32px;height:32px;border-radius:2px;border:1px solid ${C_EDGE};background:${C_BG};cursor:pointer;font-size:18px;color:#6B6B6B;flex-shrink:0;line-height:1;padding:0">×</button>
+          style="width:32px;height:32px;border-radius:2px;border:1px solid ${C_EDGE};background:${C_BG};cursor:pointer;font-size:18px;color:#6B6B6B;line-height:1;padding:0">×</button>
       </div>
       <div style="padding:20px 24px 28px">
         ${arts.length>0
@@ -1428,8 +1467,9 @@ function openSubdirModal(subdirName,base){
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  document.body.style.overflow='hidden';
+  document.body.style.overflow = 'hidden';
 }
+
 
 // ===== 【7】文章詳情 Modal =====
 
