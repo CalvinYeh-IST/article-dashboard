@@ -1200,9 +1200,9 @@ function renderDbStats(){
   const el=document.getElementById('view-dbstats');
   
   // IST 設計色票（三分類）
-  const COLOR_ALL = '#4A5568'; // 沉穩深藍灰（全資料庫）
-  const COLOR_CN  = '#C8621E'; // IST 橘（中文已上架）
-  const COLOR_EN  = '#2D3748'; // 洗鍊黑灰（英文已上架）
+  const COLOR_ALL = '#A6885D'; // 沉穩深藍灰（全資料庫）
+  const COLOR_CN  = '#EE833E'; // IST 橘（中文已上架）
+  const COLOR_EN  = '#2D2D2D'; // 洗鍊黑灰（英文已上架）
 
   el.innerHTML=`
     <div style="background:#fff;border:1px solid ${C_EDGE};padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
