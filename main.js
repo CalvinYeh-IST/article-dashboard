@@ -1284,20 +1284,45 @@ function renderDbStats(){
 
   function updateDbCharts(){
     // ── 資料真理：
-    //   全資料庫 = contentArticles 的所有文章
-    //   中文已上架 = 有 dateZh 欄位（中文上架日期）
-    //   英文已上架 = 有 dateEn 欄位（英文上架日期）
-    const allArts = contentArticles;
-    const total   = allArts.length;
+    //   全資料庫  = contentArticles（content.json，有主題/地方/時令/子目錄等分類欄位）
+    //   中文已上架 = 該文章的 dateZh 有值
+    //   英文已上架 = 該文章的 dateEn 有值
+    //
+    // ⚠️ 根本問題：contentArticles（content.json）本身不含 dateZh/dateEn，
+    //   這兩個欄位在 articles（data.json）裡。
+    //   解法：建立 title → {dateZh, dateEn} 的索引表，讓兩份資料能 cross-reference。
+    //   優先順序：content.json 自帶的日期 > data.json 查到的日期（向後相容）
+
+    // Step 1：從 articles（data.json）建立 title 索引
+    const dateByTitle = new Map();
+    articles.forEach(a => {
+      if(a.title) dateByTitle.set(a.title, { dateZh: a.dateZh||'', dateEn: a.dateEn||'' });
+    });
+
+    // Step 2：為每篇 contentArticle 解析出實際日期
+    //   如果 content.json 自帶日期就用自帶的，否則從 data.json 查
+    const allArts = contentArticles.map(a => {
+      const ref = dateByTitle.get(a.title) || {};
+      return {
+        ...a,
+        _dateZh: a.dateZh || ref.dateZh || '',
+        _dateEn: a.dateEn || ref.dateEn || '',
+      };
+    });
+    const total = allArts.length;
 
     const badge=document.getElementById('db-total-badge');
-    if(badge) badge.textContent=`內容資料庫共 ${total} 篇`;
+    if(badge) badge.textContent=`內容資料庫共 ${total} 篇（中文已上架 ${allArts.filter(a=>!!a._dateZh).length} 篇 · 英文已上架 ${allArts.filter(a=>!!a._dateEn).length} 篇）`;
+
+    // 統一使用 _dateZh / _dateEn 做已上架判斷
+    const hasCN = a => !!a._dateZh;
+    const hasEN = a => !!a._dateEn;
 
     // ── 五大主題
     const themeData=THEMES.map(t=>({
       total: allArts.filter(a=> safeArr(a,'theme').includes(t)).length,
-      cn:    allArts.filter(a=> safeArr(a,'theme').includes(t) && !!a.dateZh).length,
-      en:    allArts.filter(a=> safeArr(a,'theme').includes(t) && !!a.dateEn).length,
+      cn:    allArts.filter(a=> safeArr(a,'theme').includes(t) && hasCN(a)).length,
+      en:    allArts.filter(a=> safeArr(a,'theme').includes(t) && hasEN(a)).length,
     }));
     if(dbThemeChart) dbThemeChart.destroy();
     dbThemeChart=new Chart(
@@ -1308,8 +1333,8 @@ function renderDbStats(){
     // ── 地方探索
     const regionData=REGIONS.map(r=>({
       total: allArts.filter(a=> safeArr(a,'region').includes(r)).length,
-      cn:    allArts.filter(a=> safeArr(a,'region').includes(r) && !!a.dateZh).length,
-      en:    allArts.filter(a=> safeArr(a,'region').includes(r) && !!a.dateEn).length,
+      cn:    allArts.filter(a=> safeArr(a,'region').includes(r) && hasCN(a)).length,
+      en:    allArts.filter(a=> safeArr(a,'region').includes(r) && hasEN(a)).length,
     }));
     if(dbRegionChart) dbRegionChart.destroy();
     dbRegionChart=new Chart(
@@ -1320,8 +1345,8 @@ function renderDbStats(){
     // ── 時令探索
     const seasonData=SEASONS.map(s=>({
       total: allArts.filter(a=> safeArr(a,'season').includes(s)).length,
-      cn:    allArts.filter(a=> safeArr(a,'season').includes(s) && !!a.dateZh).length,
-      en:    allArts.filter(a=> safeArr(a,'season').includes(s) && !!a.dateEn).length,
+      cn:    allArts.filter(a=> safeArr(a,'season').includes(s) && hasCN(a)).length,
+      en:    allArts.filter(a=> safeArr(a,'season').includes(s) && hasEN(a)).length,
     }));
     if(dbSeasonChart) dbSeasonChart.destroy();
     dbSeasonChart=new Chart(
@@ -1336,8 +1361,8 @@ function renderDbStats(){
         if(!s) return;
         if(!subdirMap[s]) subdirMap[s]={total:0,cn:0,en:0};
         subdirMap[s].total++;
-        if(a.dateZh) subdirMap[s].cn++;
-        if(a.dateEn) subdirMap[s].en++;
+        if(hasCN(a)) subdirMap[s].cn++;
+        if(hasEN(a)) subdirMap[s].en++;
       });
     });
     const subdirEntries=Object.entries(subdirMap).sort((a,b)=>b[1].total-a[1].total);
