@@ -275,9 +275,9 @@ async function doUnlock(){
 
 <div class="settings-panel" id="settings-panel">
   <h4>Gemini API Key 設定</h4>
-  <p>Key 只存在你的瀏覽器本機，不會出現在程式碼或 GitHub 上。<br>換電腦或清除瀏覽器資料後需重新貼上。</p>
+  <p>每個人用自己申請的 Gemini API Key 即可。<br>Key 只存在你的瀏覽器本機，不會上傳到任何地方。<br>換電腦或清除瀏覽器資料後需重新貼上。</p>
   <div class="settings-row">
-    <input class="settings-input" id="settings-key-input" type="password" placeholder="貼上 AIza 開頭的 Key">
+    <input class="settings-input" id="settings-key-input" type="password" placeholder="貼上你的 Gemini API Key">
     <button class="settings-save" onclick="saveGeminiKey()">儲存</button>
   </div>
   <div class="settings-status" id="settings-status"></div>
@@ -303,10 +303,7 @@ function saveGeminiKey() {
     updateSettingsStatus('請貼上你的 Gemini API Key', false);
     return;
   }
-  if (!val.startsWith('AIza')) {
-    updateSettingsStatus('格式不對，Key 應以 AIza 開頭', false);
-    return;
-  }
+  // 移除 AIza 格式限制，任何人的 Gemini Key 皆可使用
   localStorage.setItem('gemini_key', val);
   window.__GEMINI_KEY__ = val;
   input.value       = '';
