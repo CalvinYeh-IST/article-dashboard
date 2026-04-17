@@ -196,9 +196,9 @@ function kpiBlock(lang,stats,elId){
     const t=kpi[q],l=liveByQ[q]||0;
     const lp=Math.min(100,pct(l,t));
     return`<div class="progress-row">
-      <span class="p-label">${q} / ${t}</span>
+      <span class="p-label">${q} / <strong>${t}</strong> 篇</span>
       <div class="p-track"><div class="p-ac" style="width:${lp}%;background:${color}"></div></div>
-      <div class="p-nums">已上架 <strong style="color:${color}">${l}</strong></div>
+      <div class="p-nums">已上架 <strong style="color:${color}">${l}</strong> 篇</div>
       ${pill(pct(l,t))}
     </div>`;
   }).join('');
@@ -300,17 +300,15 @@ function renderExec(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
       <div style="background:#FBF0E8;border:1px solid #EDB896;padding:1.25rem">
         <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:${C_ORANGE};margin-bottom:8px">已上架文章</div>
-        <div style="font-size:40px;font-weight:300;color:${C_ORANGE};line-height:1;margin-bottom:14px;letter-spacing:-.02em">${cnPub}</div>
+        <div style="font-size:40px;font-weight:300;color:${C_ORANGE};line-height:1;margin-bottom:14px;letter-spacing:-.02em">${cnPub+enPub}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:rgba(255,255,255,0.8);padding:.875rem">
+          <div style="background:rgba(255,255,255,0.8);padding:.875rem;cursor:default" title="有中文上架日期即計入中文稿已上架">
             <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:${C_ORANGE};margin-bottom:4px">中文稿</div>
             <div style="font-size:24px;font-weight:300;color:${C_ORANGE}">${cnPub}</div>
-            <div style="font-size:10px;color:#9C4A12;margin-top:3px">有中文上架日期</div>
           </div>
-          <div style="background:rgba(255,255,255,0.8);padding:.875rem">
+          <div style="background:rgba(255,255,255,0.8);padding:.875rem;cursor:default" title="有英文上架日期即計入英譯稿已上架">
             <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#1A6B45;margin-bottom:4px">英譯稿</div>
             <div style="font-size:24px;font-weight:300;color:#1A6B45">${enPub}</div>
-            <div style="font-size:10px;color:#1A6B45;margin-top:3px">有英文上架日期</div>
           </div>
         </div>
       </div>
@@ -318,12 +316,13 @@ function renderExec(){
         <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#A35200;margin-bottom:8px">未上架文章</div>
         <div style="font-size:40px;font-weight:300;color:#A35200;line-height:1;margin-bottom:8px;letter-spacing:-.02em">${unpub}</div>
         <div style="font-size:10px;color:#A35200;margin-bottom:10px">= 總數 ${total} − 中文稿上架 ${cnPub}</div>
+        <!-- ★ 固定順序：待上架→待初審→待改稿，含括號說明 -->
         <div style="display:flex;flex-direction:column;gap:5px">
-          ${Object.entries(statusCounts).map(([s,n])=>n>0?`
+          ${[['待上架','長官尚未簽核'],['待初審','長官尚未審閱'],['待改稿','編輯尚未潤稿']].map(([s,hint])=>`
             <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.7);padding:6px 10px">
-              <span style="font-size:11px;color:#A35200">${s}</span>
-              <span style="font-size:13px;font-weight:500;color:#A35200">${n} 篇</span>
-            </div>`:'').join('')}
+              <span style="font-size:11px;color:#A35200">${s}<span style="font-size:9px;color:#C8782A;margin-left:3px">(${hint})</span></span>
+              <span style="font-size:13px;font-weight:500;color:#A35200">${statusCounts[s]||0} 篇</span>
+            </div>`).join('')}
           ${statusCounts['待上架']+statusCounts['待改稿']+statusCounts['待初審']<unpub?`
             <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.5);padding:6px 10px">
               <span style="font-size:11px;color:#6B6B6B">其他</span>
@@ -1200,7 +1199,7 @@ function renderDbStats(){
   const el=document.getElementById('view-dbstats');
   
   // IST 設計色票（三分類）
-  const COLOR_ALL = '#DBCEAF'; // 奶茶咖啡（全資料庫）
+  const COLOR_ALL = '#A6885D'; // 沉穩深藍灰（全資料庫）
   const COLOR_CN  = '#EE833E'; // IST 橘（中文已上架）
   const COLOR_EN  = '#2D2D2D'; // 洗鍊黑灰（英文已上架）
 
