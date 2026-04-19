@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>IST · Taiwan Travel Planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+  *{box-sizing:border-box}
+  html,body,#root{height:100%;margin:0}
+  body{font-family:var(--ist-font-sans);color:var(--ist-ink);background:#F8F7F5;overflow:hidden}
+  #map{position:absolute;inset:0;z-index:0;filter:saturate(.9) contrast(.97)}
+  .leaflet-container{background:#EDEAE3;font-family:var(--ist-font-sans)}
+  .ist-marker{background:#1C1C1C;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);transition:transform .2s,background .2s;cursor:pointer}
+  .ist-marker.active{background:#C8621E;transform:scale(1.15)}
+  .leaflet-marker-icon{background:transparent!important;border:none!important}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-thumb{background:#D3D1C7;border-radius:3px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* glass search bar */
+  .glass{
+    background:rgba(255,255,255,.72);
+    backdrop-filter:blur(16px) saturate(1.4);
+    -webkit-backdrop-filter:blur(16px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.65);
+    box-shadow:0 10px 40px -8px rgba(28,28,28,.18), 0 2px 8px rgba(28,28,28,.06);
+  }
+  .pulse{animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+  .skel{background:linear-gradient(90deg,#EDEAE3 0%,#F8F7F5 50%,#EDEAE3 100%);background-size:200% 100%;animation:shimmer 1.6s linear infinite;border-radius:2px}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* sparkle icon */
+  .sparkle-ic{width:14px;height:14px;display:inline-block;vertical-align:-2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const ARTICLES = [
+  {
+    id: 1, day: 1, date: '2026-04-19',
+    title: '大稻埕老街的茶文化巡禮',
+    description: '走過百年茶行的木門，在迪化街聽老闆娘講述東方美人茶的起源與泡法。',
+    lat: 25.0559, lng: 121.5096,
+    time: '09:00 AM',
+    district: '台北 · 大稻埕',
+    author: '林家瑜',
+    readTime: '6 min read',
+    image_url: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=900&h=600&fit=crop',
+    content: [
+      '迪化街北段的這家茶行，從 1920 年代日治時期開業至今，木造門框仍維持著最初的樣子。第四代老闆娘沈太太說，她小時候最愛的事就是偷喝祖父為客人試泡的那一杯。',
+      '「東方美人茶是唯一一種，被蟲咬過反而更值錢的茶。」沈太太邊說邊燒水。小綠葉蟬在初夏咬過的葉片，會釋出獨特的蜜香，這是它能賣到一斤上萬元的祕密。',
+      '在茶行後方有一個只容兩人坐下的試茶室，牆上掛著三代人的合影。如果你運氣好，遇到沈太太心情好的下午，她會拿出自家私藏的 1998 年老白茶。',
+    ],
+    tags: ['茶文化', '老街', '台北'],
+  },
+  {
+    id: 2, day: 1, date: '2026-04-19',
+    title: '台中第二市場的台式早午餐',
+    description: '從顏記肉包到老王菜頭粿，日治時期的紅磚市場藏著台中最日常的味道。',
+    lat: 24.1465, lng: 120.6805,
+    time: '12:30 PM',
+    district: '台中 · 中區',
+    author: '陳昱廷',
+    readTime: '5 min read',
+    image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&h=600&fit=crop',
+    content: [
+      '1917 年落成的第二市場，是台中人從阿嬤那一代就開始吃早餐的地方。六角形的紅磚建築中央，放射狀延伸出三條走道，每一條都是一部味道的編年史。',
+      '顏記肉包的第三代老闆每天凌晨三點開始揉麵糰，堅持用老麵發酵。他說現在的年輕人愛吃軟綿綿的包子，但他還是要做有嚼勁的。',
+      '隔壁老王菜頭粿，油鍋前永遠排隊。酥脆的外皮、濕潤的內裡，淋上特調的醬油膏和蒜蓉辣椒，是台中獨有的吃法。',
+    ],
+    tags: ['小吃', '市場', '台中'],
+  },
+  {
+    id: 3, day: 1, date: '2026-04-19',
+    title: '阿里山日出與鄒族咖啡',
+    description: '海拔 1200 公尺的樂野部落，鄒族青年接手咖啡園，與森林共生的第二代。',
+    lat: 23.5101, lng: 120.8039,
+    time: '03:45 PM',
+    district: '嘉義 · 阿里山',
+    author: '高明達',
+    readTime: '8 min read',
+    image_url: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=900&h=600&fit=crop',
+    content: [
+      '海拔 1200 公尺的樂野部落，霧氣幾乎整年都在。鄒族青年 Voyu 從父親手中接下這片咖啡園，是部落裡第二代專業咖啡農。',
+      '「我們不砍原生樹，咖啡樹就長在林蔭底下。」Voyu 指著頭頂的茄苳樹說。這種「shade-grown」方式讓咖啡豆成長得更慢，風味更複雜，但產量只有一般日曬園的三分之一。',
+      '傍晚的烘豆屋，空氣中全是焦糖和柑橘的香氣。Voyu 沖一杯 V60 給你，杯底沉澱著一整個森林的濕潤。',
+    ],
+    tags: ['咖啡', '原住民', '阿里山'],
+  },
+  {
+    id: 4, day: 1, date: '2026-04-19',
+    title: '台南府城小吃地圖',
+    description: '從國華街的永樂牛肉湯到保安路的阿堂鹹粥，一天不夠吃完的府城清晨。',
+    lat: 22.9945, lng: 120.2025,
+    time: '07:00 PM',
+    district: '台南 · 中西區',
+    author: '王佩芬',
+    readTime: '7 min read',
+    image_url: 'https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=900&h=600&fit=crop',
+    content: [
+      '國華街是台南人公認的美食總站。凌晨四點，永樂牛肉湯的老闆已經開始切肉——當天屠宰的溫體牛，薄如紙張的肉片燙過高湯就起鍋。',
+      '走幾步到保安路，阿堂鹹粥用虱目魚頭熬湯底，一口下去鮮味從喉嚨裡散開。老台南人會再加一顆荷包蛋，把蛋黃戳破拌進粥裡。',
+      '下午三點是台南最安靜的時刻，所有小吃攤都休息，只有冰店在營業。莉莉水果店的芒果牛奶冰，從 1947 年開到現在。',
+    ],
+    tags: ['小吃', '府城', '台南'],
+  },
+  {
+    id: 5, day: 2, date: '2026-04-20',
+    title: '花蓮縱谷的咖啡產區走讀',
+    description: '193 縣道旁的豐田咖啡，第三代農人用自然農法重新定義台灣咖啡風土。',
+    lat: 23.7418, lng: 121.4418,
+    time: '10:00 AM',
+    district: '花蓮 · 壽豐',
+    author: '張文瀚',
+    readTime: '6 min read',
+    image_url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&h=600&fit=crop',
+    content: [
+      '193 縣道是花東縱谷最美的鄉道之一，路兩旁不是稻田就是咖啡園。豐田村的第三代農人阿偉，五年前從台北辭職回鄉接手家業。',
+      '「我不用化肥，雜草都用手拔。」阿偉蹲下來拔起一把草，塞給你看根的形狀。他說爺爺那輩就是這樣種的，到了爸爸那代為了產量才改用農藥。',
+      '縱谷的晨霧和中央山脈的雪水，讓這裡的咖啡有著明亮的酸質和花香。阿偉在自家烘焙廠裡給你試三款不同處理法的豆子，你會發現「台灣咖啡」原來有這麼多種可能。',
+    ],
+    tags: ['咖啡', '縱谷', '花蓮'],
+  },
+];
+
+const DAY_META = {
+  1: { label: 'Day 1', dateLabel: '4/19 週日 · 台北 → 台南', subtitle: '北部茶文化 → 中南部小吃' },
+  2: { label: 'Day 2', dateLabel: '4/20 週一 · 台南 → 花蓮', subtitle: '跨越中央山脈到東部' },
+};
+
+// ========== Sparkle (Lucide-style inline SVG) ==========
+const Sparkle = ({ size = 14, color = 'currentColor' }) => (
+  <svg className="sparkle-ic" style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3l1.9 5.5L19 10l-5.1 1.5L12 17l-1.9-5.5L5 10l5.1-1.5L12 3z"/>
+    <path d="M19 17l.7 2.1L22 20l-2.3.9L19 23l-.7-2.1L16 20l2.3-.9L19 17z"/>
+  </svg>
+);
+const IconCopy = ({ size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+);
+const IconRoute = ({ size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8 19h5a4 4 0 0 0 0-8h-2a4 4 0 0 1 0-8h4"/></svg>
+);
+const IconClose = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+);
+const IconClock = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+);
+const IconPin = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-7-7-7-12a7 7 0 0 1 14 0c0 5-7 12-7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+);
+const IconUser = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+);
+const IconExternal = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6"/><path d="M10 14L20 4"/><path d="M19 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>
+);
+
+// ========== Article Modal (matches article-dashboard card aesthetic) ==========
+function ArticleModal({ article, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!article) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,.36)',
+        backdropFilter: 'blur(3px)',
+        WebkitBackdropFilter: 'blur(3px)',
+        zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+        animation: 'fadein .18s ease-out',
+      }}
+    >
+      <style>{`@keyframes fadein{from{opacity:0}to{opacity:1}}@keyframes slideup{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: 14,
+          border: '1px solid #e8e8e4',
+          width: 720,
+          maxWidth: '100%',
+          maxHeight: '92vh',
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '0 24px 64px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.08)',
+          animation: 'slideup .22s cubic-bezier(.2,.8,.2,1)',
+        }}
+      >
+        {/* Hero image */}
+        <div style={{
+          height: 260,
+          flexShrink: 0,
+          backgroundImage: `url(${article.image_url})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          position: 'relative',
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute', top: 14, right: 14,
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'rgba(255,255,255,.95)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#1a1a1a',
+              boxShadow: '0 2px 8px rgba(0,0,0,.15)',
+              transition: 'background .15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#fff'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.95)'}
+          >
+            <IconClose />
+          </button>
+          {/* Tags overlay */}
+          <div style={{ position: 'absolute', bottom: 14, left: 18, display: 'flex', gap: 6 }}>
+            {article.tags?.map(t => (
+              <span key={t} style={{
+                fontSize: 10, padding: '3px 10px', borderRadius: 12,
+                background: 'rgba(255,255,255,.92)', color: '#185FA5',
+                fontWeight: 500, letterSpacing: '.02em',
+              }}>{t}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Body — scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px 28px' }}>
+          {/* Meta row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: '#888780', marginBottom: 10, flexWrap: 'wrap' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconClock /> {article.time}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconPin /> {article.district}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><IconUser /> {article.author}</span>
+            <span>· {article.readTime}</span>
+          </div>
+
+          <h1 style={{ fontSize: 24, fontWeight: 500, color: '#1a1a1a', margin: '0 0 14px', lineHeight: 1.3, letterSpacing: '-.005em' }}>
+            {article.title}
+          </h1>
+
+          {/* Lede */}
+          <p style={{ fontSize: 15, color: '#444', lineHeight: 1.7, margin: '0 0 20px', fontWeight: 400, paddingBottom: 16, borderBottom: '1px solid #f1efe8' }}>
+            {article.description}
+          </p>
+
+          {/* Paragraphs */}
+          {article.content?.map((para, i) => (
+            <p key={i} style={{ fontSize: 14, color: '#1a1a1a', lineHeight: 1.85, margin: '0 0 16px' }}>{para}</p>
+          ))}
+
+          {/* Footer strip — mirrors OpsView modal actions */}
+          <div style={{
+            marginTop: 20, paddingTop: 18,
+            borderTop: '1px solid #f1efe8',
+            display: 'flex', gap: 8, justifyContent: 'flex-end',
+          }}>
+            <button onClick={onClose} style={{
+              background: '#fff', border: '1px solid #d3d1c7', color: '#888780',
+              fontSize: 13, padding: '7px 18px', borderRadius: 8, cursor: 'pointer',
+            }}>關閉</button>
+            <button style={{
+              background: '#E6F1FB', border: '1px solid #B5D4F4', color: '#185FA5',
+              fontSize: 13, padding: '7px 18px', borderRadius: 8, cursor: 'pointer', fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <IconExternal /> 閱讀完整文章
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== Day Divider ==========
+function DayDivider({ day }) {
+  const meta = DAY_META[day];
+  if (!meta) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: 12, margin: '6px 0 -8px', alignItems: 'center' }}>
+      <div style={{
+        textAlign: 'right', paddingRight: 4,
+        fontSize: 10, fontWeight: 600, color: '#C8621E',
+        letterSpacing: '.14em', textTransform: 'uppercase',
+      }}>
+        {meta.label}
+      </div>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '8px 12px',
+        background: 'linear-gradient(to right, rgba(200,98,30,.08), rgba(200,98,30,.02) 80%, transparent)',
+        borderRadius: 8,
+        borderLeft: '2px solid #C8621E',
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a', letterSpacing: '.01em' }}>
+          {meta.dateLabel}
+        </div>
+        <div style={{ fontSize: 10, color: '#9A9A96' }}>· {meta.subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
+// ========== Timeline Card ==========
+function TimelineItem({ article, index, active, isLast, onHover, onClick, cardRef }) {
+  return (
+    <div
+      ref={cardRef}
+      onMouseEnter={() => onHover(article.id)}
+      onClick={() => onClick(article)}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '70px 1fr',
+        gap: 12,
+        cursor: 'pointer',
+        position: 'relative',
+      }}
+    >
+      {/* Left: time + vertical line */}
+      <div style={{ position: 'relative', paddingTop: 6 }}>
+        <div style={{ fontSize: 11, color: active ? '#C8621E' : '#6B6B6B', fontWeight: 500, letterSpacing: '.02em', marginBottom: 4, textAlign: 'right', paddingRight: 4 }}>
+          {article.time}
+        </div>
+        <div style={{ fontSize: 9, color: '#9A9A96', textAlign: 'right', paddingRight: 4, letterSpacing: '.05em' }}>
+          {article.district}
+        </div>
+        {/* dot */}
+        <div style={{
+          position: 'absolute',
+          right: -6, top: 8,
+          width: 11, height: 11, borderRadius: '50%',
+          background: active ? '#C8621E' : '#1C1C1C',
+          border: '2px solid #fff',
+          boxShadow: '0 0 0 1px ' + (active ? '#C8621E' : '#E2E0DC'),
+          transition: 'all .2s',
+          zIndex: 2,
+        }} />
+        {/* vertical line */}
+        {!isLast && (
+          <div style={{
+            position: 'absolute',
+            right: -1, top: 22, bottom: -20,
+            width: 1,
+            background: 'linear-gradient(to bottom, #E2E0DC 0%, #E2E0DC 85%, transparent 100%)',
+          }} />
+        )}
+      </div>
+
+      {/* Right: card */}
+      <div style={{
+        background: active ? '#F2F1EE' : 'transparent',
+        borderRadius: 10,
+        padding: '8px 10px',
+        margin: '-4px -6px',
+        transition: 'background .15s',
+      }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{
+            width: 64, height: 64, flexShrink: 0,
+            borderRadius: 6, overflow: 'hidden',
+            background: '#EDEAE3',
+            backgroundImage: `url(${article.image_url})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#1C1C1C', lineHeight: 1.35, marginBottom: 4 }}>
+              {article.title}
+            </div>
+            <div style={{ fontSize: 11, color: '#6B6B6B', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              {article.description}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== Timeline Panel ==========
+function TimelinePanel({ articles, activeId, onHover, onCardClick, onCardOpen, loading, panelRef, cardRefs, copied, onCopy }) {
+  return (
+    <div ref={panelRef} style={{
+      position: 'absolute',
+      top: 20, right: 20, bottom: 20,
+      width: 380,
+      background: '#fff',
+      borderRadius: 14,
+      boxShadow: '0 20px 60px -12px rgba(28,28,28,.22), 0 4px 14px rgba(28,28,28,.06)',
+      border: '1px solid rgba(226,224,220,.8)',
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: 400,
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid #F1EFE8' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <Sparkle size={11} color="#C8621E" />
+          <span style={{ fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: '#C8621E', fontWeight: 600 }}>AI-GENERATED ITINERARY</span>
+        </div>
+        {loading ? (
+          <div>
+            <div className="skel" style={{ width: '85%', height: 18, marginBottom: 8 }} />
+            <div className="skel" style={{ width: '60%', height: 18, marginBottom: 12 }} />
+            <div className="skel" style={{ width: '100%', height: 11, marginBottom: 6 }} />
+            <div className="skel" style={{ width: '90%', height: 11 }} />
+          </div>
+        ) : (
+          <>
+            <h1 style={{ fontSize: 18, fontWeight: 500, color: '#1C1C1C', margin: 0, lineHeight: 1.35, letterSpacing: '-.005em' }}>
+              從台北一路南下阿里山：一場以茶、小吃與咖啡串起的文化走讀
+            </h1>
+            <p style={{ fontSize: 12, color: '#6B6B6B', margin: '10px 0 0', lineHeight: 1.6 }}>
+              兩天一夜，從迪化街的百年茶行出發，穿過台中與台南的日常食堂，最後抵達阿里山高海拔咖啡產區。5 個點、約 380 公里，以文化與味道為軸線。
+            </p>
+          </>
+        )}
+
+        {/* Meta row */}
+        {!loading && (
+          <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 10, color: '#9A9A96', letterSpacing: '.03em' }}>
+            <span>{articles.length} 站</span>
+            <span>·</span>
+            <span>約 2 天</span>
+            <span>·</span>
+            <span>380 km</span>
+          </div>
+        )}
+
+        {/* Actions */}
+        {!loading && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+            <button style={{
+              flex: 1,
+              padding: '9px 14px',
+              background: '#1C1C1C',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              transition: 'background .15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#000'}
+              onMouseLeave={e => e.currentTarget.style.background = '#1C1C1C'}
+            >
+              <IconRoute /> Open route
+            </button>
+            <button onClick={onCopy} style={{
+              padding: '9px 14px',
+              background: '#fff',
+              color: '#1C1C1C',
+              border: '1px solid #E2E0DC',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'background .15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#F8F7F5'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            >
+              <IconCopy /> {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 24px' }}>
+        {loading ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Sparkle size={13} color="#C8621E" />
+              <span className="pulse" style={{ fontSize: 12, color: '#6B6B6B', letterSpacing: '.02em' }}>
+                AI 正為您規劃專屬行程…
+              </span>
+            </div>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: 12, marginBottom: 20 }}>
+                <div>
+                  <div className="skel" style={{ width: 44, height: 11, marginLeft: 'auto', marginBottom: 6 }} />
+                  <div className="skel" style={{ width: 54, height: 9, marginLeft: 'auto' }} />
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="skel" style={{ width: 64, height: 64, borderRadius: 6, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="skel" style={{ width: '80%', height: 13, marginBottom: 6 }} />
+                    <div className="skel" style={{ width: '100%', height: 10, marginBottom: 4 }} />
+                    <div className="skel" style={{ width: '70%', height: 10 }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {articles.map((a, i) => {
+              const prevDay = i > 0 ? articles[i - 1].day : null;
+              const showDivider = a.day !== prevDay;
+              return (
+                <React.Fragment key={a.id}>
+                  {showDivider && <DayDivider day={a.day} />}
+                  <TimelineItem
+                    article={a}
+                    index={i}
+                    active={activeId === a.id}
+                    isLast={i === articles.length - 1}
+                    onHover={onHover}
+                    onClick={onCardOpen}
+                    cardRef={el => { if (cardRefs.current) cardRefs.current[a.id] = el; }}
+                  />
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ========== Search Bar ==========
+function SearchBar({ onSubmit, loading }) {
+  const [val, setVal] = useState('');
+  const [focused, setFocused] = useState(false);
+  const examples = ['從台北一路南下，兩天一夜的文化與美食走讀', '台南一日小吃地圖', '花東海岸線的原住民風味'];
+
+  const submit = () => {
+    const q = val.trim() || '從台北一路南下，兩天一夜的文化與美食走讀';
+    onSubmit(q);
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 20, left: 20,
+      width: 440,
+      zIndex: 500,
+    }}>
+      <div className="glass" style={{
+        borderRadius: 14,
+        padding: '6px 6px 6px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+      }}>
+        <Sparkle size={16} color="#C8621E" />
+        <input
+          value={val}
+          disabled={loading}
+          placeholder="問問 AI：想去哪裡？要幾天？喜歡什麼？"
+          onChange={e => setVal(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onKeyDown={e => e.key === 'Enter' && submit()}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: 'transparent',
+            outline: 'none',
+            fontSize: 13,
+            color: '#1C1C1C',
+            fontFamily: 'inherit',
+            padding: '10px 0',
+            minWidth: 0,
+          }}
+        />
+        <button
+          onClick={submit}
+          disabled={loading}
+          style={{
+            background: loading ? '#B4B2A9' : '#C8621E',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 10,
+            padding: '10px 16px',
+            fontSize: 12,
+            fontWeight: 500,
+            letterSpacing: '.04em',
+            cursor: loading ? 'wait' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            transition: 'background .15s',
+            whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={e => !loading && (e.currentTarget.style.background = '#9C4A12')}
+          onMouseLeave={e => !loading && (e.currentTarget.style.background = '#C8621E')}
+        >
+          <Sparkle size={13} color="#fff" />
+          {loading ? '規劃中' : '生成行程'}
+        </button>
+      </div>
+
+      {/* Suggestion chips */}
+      {focused && !loading && (
+        <div className="glass" style={{
+          marginTop: 8,
+          borderRadius: 12,
+          padding: 8,
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', color: '#9A9A96', padding: '4px 8px 6px', fontWeight: 500 }}>
+            試試這些問題
+          </div>
+          {examples.map((ex, i) => (
+            <div
+              key={i}
+              onMouseDown={() => { setVal(ex); setTimeout(() => onSubmit(ex), 50); }}
+              style={{
+                padding: '8px 10px',
+                fontSize: 12,
+                color: '#1C1C1C',
+                borderRadius: 8,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,98,30,.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Sparkle size={11} color="#C8621E" />
+              <span>{ex}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ========== Wordmark overlay (bottom-left) ==========
+function Wordmark() {
+  return (
+    <div style={{
+      position: 'absolute', bottom: 20, left: 20,
+      zIndex: 400,
+      padding: '8px 14px',
+      background: 'rgba(255,255,255,.85)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      borderRadius: 10,
+      border: '1px solid rgba(226,224,220,.6)',
+      fontSize: 10,
+      letterSpacing: '.14em',
+      textTransform: 'uppercase',
+      color: '#6B6B6B',
+      fontWeight: 500,
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <span style={{ color: '#C8621E', fontWeight: 600 }}>IST</span>
+      <span style={{ color: '#C8621E' }}>·</span>
+      <span style={{ letterSpacing: '.04em', textTransform: 'none', fontWeight: 500, color: '#1C1C1C' }}>看見台灣基金會</span>
+    </div>
+  );
+}
+
+// ========== Main ==========
+function Planner() {
+  const [loading, setLoading] = useState(false);
+  const [hasResults, setHasResults] = useState(true);
+  const [activeId, setActiveId] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [openArticle, setOpenArticle] = useState(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef({});
+  const cardRefs = useRef({});
+  const panelRef = useRef(null);
+  const ignoreNextMarkerFly = useRef(false);
+
+  // init map
+  useEffect(() => {
+    const map = L.map('map', {
+      center: [23.8, 121.0],
+      zoom: 7,
+      zoomControl: false,
+      attributionControl: false,
+    });
+    // Muted Carto tiles — quiet warm paper fits IST palette better than default OSM
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd',
+    }).addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.control.attribution({ prefix: false, position: 'bottomright' })
+      .addAttribution('© OpenStreetMap · © CARTO').addTo(map);
+
+    mapRef.current = map;
+
+    // build markers
+    ARTICLES.forEach((a, idx) => {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="ist-marker" data-id="${a.id}">${idx + 1}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+      });
+      const m = L.marker([a.lat, a.lng], { icon }).addTo(map);
+      m.on('click', () => handleMarkerClick(a));
+      markersRef.current[a.id] = m;
+    });
+
+    return () => { map.remove(); };
+  }, []);
+
+  // update marker active state
+  useEffect(() => {
+    Object.entries(markersRef.current).forEach(([id, m]) => {
+      const el = m.getElement()?.querySelector('.ist-marker');
+      if (el) el.classList.toggle('active', Number(id) === activeId);
+    });
+  }, [activeId]);
+
+  const handleMarkerClick = (article) => {
+    setActiveId(article.id);
+    // scroll card into view in panel
+    const el = cardRefs.current[article.id];
+    const panel = panelRef.current;
+    if (el && panel) {
+      const scrollArea = panel.querySelector('[style*="overflow-y: auto"]') || panel;
+      const top = el.offsetTop - 20;
+      scrollArea.scrollTo({ top, behavior: 'smooth' });
+    }
+    if (mapRef.current) {
+      mapRef.current.flyTo([article.lat, article.lng], 11, { duration: 0.9 });
+    }
+    // Opening modal from marker click as well (per spec: 點擊之後能查看完整文章)
+    setOpenArticle(article);
+  };
+
+  const handleCardHover = (id) => {
+    setActiveId(id);
+  };
+
+  const handleCardClick = (article) => {
+    if (mapRef.current) {
+      mapRef.current.flyTo([article.lat, article.lng], 11, { duration: 0.9 });
+    }
+  };
+
+  const handleCardOpen = (article) => {
+    setActiveId(article.id);
+    if (mapRef.current) {
+      mapRef.current.flyTo([article.lat, article.lng], 11, { duration: 0.9 });
+    }
+    setOpenArticle(article);
+  };
+
+  const handleSubmit = () => {
+    setLoading(true);
+    setHasResults(false);
+    setActiveId(null);
+    setTimeout(() => {
+      setLoading(false);
+      setHasResults(true);
+      // fit bounds to all markers
+      if (mapRef.current) {
+        const bounds = L.latLngBounds(ARTICLES.map(a => [a.lat, a.lng]));
+        mapRef.current.flyToBounds(bounds, { padding: [100, 440], duration: 1.2 });
+      }
+    }, 2000);
+  };
+
+  const handleCopy = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      <div id="map"></div>
+      <SearchBar onSubmit={handleSubmit} loading={loading} />
+      {(loading || hasResults) && (
+        <TimelinePanel
+          articles={ARTICLES}
+          activeId={activeId}
+          onHover={handleCardHover}
+          onCardClick={handleCardClick}
+          onCardOpen={handleCardOpen}
+          loading={loading}
+          panelRef={panelRef}
+          cardRefs={cardRefs}
+          copied={copied}
+          onCopy={handleCopy}
+        />
+      )}
+      <ArticleModal article={openArticle} onClose={() => setOpenArticle(null)} />
+      <Wordmark />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Planner />);
+</script>
+</body>
+</html>

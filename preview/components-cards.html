@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#F8F7F5;font-family:var(--ist-font-sans);color:#1C1C1C;}
+  .g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .c{padding:14px 16px;font-size:11px;color:#6B6B6B}
+  .ttl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:500;margin-bottom:6px}
+  .flat{background:#fff;border:1px solid #E2E0DC}
+  .rounded{background:#fff;border:1px solid #E8E8E4;border-radius:12px}
+  .wash{background:#FBF0E8;border:1px solid #EDB896}
+  .wash .ttl{color:#C8621E}
+  .amber{background:#FEF3C7;border:1px solid #FDE68A}
+  .amber .ttl{color:#A35200}
+  .muted{background:#F2F1EE;border:1px solid #E2E0DC}
+</style></head>
+<body>
+  <div class="g">
+    <div class="c flat"><div class="ttl">Flat card</div>default surface · 1px border · no radius</div>
+    <div class="c rounded"><div class="ttl">Rounded card</div>legacy surface · 12px radius · floating use</div>
+    <div class="c muted"><div class="ttl">Muted surface</div>table header · inactive block</div>
+    <div class="c wash"><div class="ttl">Orange wash</div>Chinese-content emphasis banner</div>
+    <div class="c amber"><div class="ttl">Amber callout</div>unpublished / warning surface</div>
+    <div class="c flat" style="box-shadow:0 8px 32px rgba(0,0,0,.12)"><div class="ttl">Floating modal</div>flat + shadow-lg only</div>
+  </div>
+</body></html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#fff;font-family:var(--ist-font-sans);color:var(--ist-ink);}
+  .group{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ist-mute-3);margin:4px 0 8px;font-weight:500}
+  .f{margin-bottom:14px}
+  .f label{display:block;font-size:11px;color:#888780;margin-bottom:4px}
+  .f input,.f select{width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;color:#1a1a1a;outline:none;box-sizing:border-box}
+  .f input:focus{border-color:#C8621E}
+  .filter{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .filter input,.filter select{font-size:12px;padding:4px 10px;height:32px;border-radius:8px;border:1px solid #d3d1c7;background:#fff;outline:none}
+  .lock{width:260px;font-size:14px;padding:10px 12px;border:1px solid #E2E0DC;background:#fff;color:#1C1C1C;outline:none;letter-spacing:.12em;text-align:center;box-sizing:border-box}
+</style></head>
+<body>
+  <div class="group">Modal field · rounded 8px</div>
+  <div class="f"><label>標題</label><input placeholder="文章標題"></div>
+  <div class="f"><label>狀態</label><select><option>待上架</option><option>翻譯中</option></select></div>
+  <div class="group">Filter bar · inline</div>
+  <div class="filter">
+    <input placeholder="搜尋標題…" style="width:160px">
+    <select><option>全部狀態</option><option>已上架</option></select>
+  </div>
+  <div class="group" style="margin-top:16px">Lock screen · letter-spaced, flat</div>
+  <input class="lock" type="password" placeholder="請輸入存取密碼">
+</body></html>

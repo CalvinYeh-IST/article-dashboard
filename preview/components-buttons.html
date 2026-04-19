@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#fff;font-family:var(--ist-font-sans);color:var(--ist-ink);}
+  .row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+  .group{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ist-mute-3);margin:4px 0 8px;font-weight:500}
+  /* Primary CTA: lock-screen style */
+  .btn-primary{padding:11px 22px;background:#C8621E;color:#fff;border:none;font-size:13px;font-weight:500;letter-spacing:.06em;cursor:pointer;text-transform:uppercase;}
+  .btn-primary:hover{background:#9C4A12}
+  /* Save: soft blue */
+  .btn-save{background:#E6F1FB;border:1px solid #B5D4F4;color:#185FA5;font-size:13px;padding:7px 18px;border-radius:8px;cursor:pointer;font-weight:500}
+  /* Soft orange: AI */
+  .btn-ai{font-size:12px;padding:9px 18px;border-radius:2px;border:1px solid #EDB896;background:#FBF0E8;color:#C8621E;cursor:pointer;font-weight:500}
+  /* Cancel */
+  .btn-cancel{background:#fff;border:1px solid #D3D1C7;color:#888780;font-size:13px;padding:7px 18px;border-radius:8px;cursor:pointer}
+  /* Small utility */
+  .btn-sm{font-size:12px;padding:4px 12px;height:32px;border-radius:8px;cursor:pointer;border:1px solid #D3D1C7;background:#fff;color:#1a1a1a}
+  /* Year tab */
+  .yr{padding:5px 14px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid #d3d1c7;background:#fff;color:#888780}
+  .yr.active{background:#C8621E;border-color:#C8621E;color:#fff;font-weight:500}
+</style></head>
+<body>
+  <div class="group">Primary · uppercase</div>
+  <div class="row"><button class="btn-primary">進入</button><button class="btn-primary">Submit</button></div>
+  <div class="group">Soft · save / AI / cancel</div>
+  <div class="row"><button class="btn-save">儲存</button><button class="btn-ai">AI 查詢</button><button class="btn-cancel">取消</button></div>
+  <div class="group">Utility · filter bar</div>
+  <div class="row"><button class="btn-sm">匯出 CSV</button><button class="btn-sm">+ 新增文章</button></div>
+  <div class="group">Year tabs · pill</div>
+  <div class="row"><button class="yr active">2026</button><button class="yr">2025</button><button class="yr">2024</button></div>
+</body></html>

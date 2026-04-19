@@ -1,0 +1,150 @@
+/* ==========================================================================
+   IST 看見台灣基金會 — Foundations
+   Colors + Type tokens, derived from the article-dashboard codebase.
+   ========================================================================== */
+
+:root {
+  /* ---- Brand core ---- */
+  --ist-orange:        #C8621E;   /* Primary brand — Chinese content / key CTAs */
+  --ist-orange-deep:   #9C4A12;   /* Hover state for orange CTAs */
+  --ist-orange-soft:   #EDB896;   /* Tinted borders / dashed targets */
+  --ist-orange-wash:   #FBF0E8;   /* Tinted fills (banner, card backgrounds) */
+
+  --ist-ink:           #1C1C1C;   /* Headings, primary text */
+  --ist-ink-2:         #2D2D2D;   /* English content accent */
+  --ist-ink-3:         #3D3D3D;   /* Chart English series */
+
+  /* ---- Neutral warm paper palette ---- */
+  --ist-paper:         #F8F7F5;   /* App background */
+  --ist-surface:       #F2F1EE;   /* Card surface alt / table header */
+  --ist-surface-2:     #F5F5F3;   /* Older page bg */
+  --ist-edge:          #E2E0DC;   /* Primary border */
+  --ist-edge-2:        #E8E8E4;   /* Softer card border */
+  --ist-edge-3:        #F1EFE8;   /* Divider inside cards */
+  --ist-mute:          #9A9A96;   /* Tertiary text */
+  --ist-mute-2:        #888780;   /* Secondary text */
+  --ist-mute-3:        #6B6B6B;   /* Caption strong */
+  --ist-mute-4:        #B4B2A9;   /* Placeholder / de-emphasised */
+  --ist-paper-mono:    #D3D1C7;   /* Input borders */
+
+  /* ---- Chart / accent ---- */
+  --ist-en-chart:      #1D9E75;   /* English content chart (green) */
+  --ist-teal-deep:     #0F6E56;
+  --ist-purple:        #7F77DD;
+  --ist-purple-deep:   #534AB7;
+  --ist-amber:         #EF9F27;
+  --ist-blue:          #185FA5;   /* Legacy blue (older views) */
+  --ist-blue-soft:     #E6F1FB;
+  --ist-blue-border:   #B5D4F4;
+
+  /* ---- Semantic: status ---- */
+  --ist-ok-fg:         #1A6B45;
+  --ist-ok-bg:         #D1FAE5;
+  --ist-ok-border:     #6EE7B7;
+
+  --ist-warn-fg:       #A35200;
+  --ist-warn-bg:       #FEF3C7;
+  --ist-warn-border:   #FDE68A;
+
+  --ist-danger-fg:     #B91C1C;
+  --ist-danger-bg:     #FEE2E2;
+  --ist-danger-border: #FECACA;
+
+  --ist-info-fg:       #3B6D11;  /* badge "ok/達標" */
+  --ist-info-bg:       #EAF3DE;
+
+  /* ---- Typography ---- */
+  --ist-font-sans: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC",
+                   "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --ist-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Scale (matches dashboard conventions) */
+  --ist-fs-hero:       52px;  /* Big numbers (total articles) */
+  --ist-fs-display:    40px;  /* Secondary big number */
+  --ist-fs-stat:       32px;  /* Stat block value */
+  --ist-fs-stat-sm:    26px;  /* mcard value */
+  --ist-fs-h1:         20px;  /* Page title */
+  --ist-fs-h2:         18px;
+  --ist-fs-h3:         15px;  /* Modal / section title */
+  --ist-fs-body:       14px;  /* Body, table */
+  --ist-fs-body-sm:    13px;
+  --ist-fs-caption:    12px;  /* Caption, form labels */
+  --ist-fs-label:      11px;  /* Secondary meta */
+  --ist-fs-micro:      10px;  /* UPPERCASE eyebrow */
+  --ist-fs-nano:       9px;   /* Tiny legend/chart axis */
+
+  /* Weights — kept deliberately narrow: thin for display, 400/500 elsewhere */
+  --ist-fw-thin:       300;   /* Hero numerals */
+  --ist-fw-regular:    400;
+  --ist-fw-medium:     500;   /* Section titles, buttons */
+  --ist-fw-bold:       600;   /* Eyebrow badges only */
+
+  /* Letter spacing */
+  --ist-ls-tight:      -0.02em; /* Hero numerals */
+  --ist-ls-normal:      0;
+  --ist-ls-caption:    0.02em;
+  --ist-ls-eyebrow:    0.08em;  /* UPPERCASE small caps */
+  --ist-ls-eyebrow-wide: 0.1em;
+  --ist-ls-password:   0.14em;  /* Lock screen input */
+
+  /* Radii — signature flat: 0 or 2px for buttons; 8-12 for cards */
+  --ist-r-flat:        0;      /* Default for IST: no rounding */
+  --ist-r-btn:         2px;    /* Button / small pill */
+  --ist-r-input:       8px;    /* Dashboard inputs (legacy) */
+  --ist-r-card:        12px;   /* Rounded card (legacy tab views) */
+  --ist-r-pill:        20px;
+
+  /* Shadows — barely there */
+  --ist-shadow-sm:     0 1px 4px rgba(0, 0, 0, 0.08);
+  --ist-shadow-md:     0 4px 20px rgba(0, 0, 0, 0.12);
+  --ist-shadow-lg:     0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* Spacing — 4px base */
+  --ist-sp-1:  4px;
+  --ist-sp-2:  8px;
+  --ist-sp-3:  12px;
+  --ist-sp-4:  16px;
+  --ist-sp-5:  20px;
+  --ist-sp-6:  24px;
+  --ist-sp-8:  32px;
+}
+
+/* ---- Semantic element styles (optional reset shim) ---- */
+.ist-eyebrow {
+  font-size: var(--ist-fs-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--ist-ls-eyebrow-wide);
+  color: var(--ist-mute-3);
+  font-weight: var(--ist-fw-medium);
+}
+.ist-h1 { font-size: var(--ist-fs-h1); font-weight: var(--ist-fw-medium); color: var(--ist-ink); letter-spacing: var(--ist-ls-normal); }
+.ist-h2 { font-size: var(--ist-fs-h2); font-weight: var(--ist-fw-medium); color: var(--ist-ink); }
+.ist-h3 { font-size: var(--ist-fs-h3); font-weight: var(--ist-fw-medium); color: var(--ist-ink); }
+.ist-body { font-size: var(--ist-fs-body); color: var(--ist-ink); }
+.ist-caption { font-size: var(--ist-fs-caption); color: var(--ist-mute-2); }
+.ist-hero-num {
+  font-size: var(--ist-fs-hero);
+  font-weight: var(--ist-fw-thin);
+  color: var(--ist-ink);
+  letter-spacing: var(--ist-ls-tight);
+  line-height: 1;
+}
+.ist-stat-num {
+  font-size: var(--ist-fs-stat);
+  font-weight: var(--ist-fw-thin);
+  letter-spacing: var(--ist-ls-tight);
+  line-height: 1;
+}
+
+/* ---- Common pill badges ---- */
+.ist-pill-ok     { background: var(--ist-info-bg);   color: var(--ist-info-fg); }
+.ist-pill-warn   { background: var(--ist-warn-bg);   color: var(--ist-warn-fg); }
+.ist-pill-danger { background: var(--ist-danger-bg); color: var(--ist-danger-fg); }
+.ist-pill {
+  display: inline-block;
+  font-size: var(--ist-fs-micro);
+  padding: 2px 6px;
+  border-radius: var(--ist-r-pill);
+  font-weight: var(--ist-fw-medium);
+  white-space: nowrap;
+}

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#F8F7F5;font-family:var(--ist-font-sans);color:#1C1C1C;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .mcard{background:#fff;border:1px solid #E8E8E4;padding:14px 16px;}
+  .lbl{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#6B6B6B;margin-bottom:6px;font-weight:500}
+  .val{font-size:28px;font-weight:300;line-height:1;color:#1C1C1C;letter-spacing:-.01em}
+  .sub{font-size:10px;color:#9A9A96;margin-top:4px}
+  .ok .val{color:#1A6B45}.warn .val{color:#A35200}.brand .val{color:#C8621E}
+</style></head>
+<body>
+  <div class="grid">
+    <div class="mcard brand"><div class="lbl">中文稿上架</div><div class="val">154</div><div class="sub">全資料庫 · 累計</div></div>
+    <div class="mcard ok"><div class="lbl">英譯稿上架</div><div class="val">113</div><div class="sub">161% of target</div></div>
+    <div class="mcard warn"><div class="lbl">待上架</div><div class="val">28</div><div class="sub">pending 長官簽核</div></div>
+  </div>
+</body></html>

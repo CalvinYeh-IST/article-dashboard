@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#fff;font-family:var(--ist-font-sans);color:var(--ist-ink);}
+  .row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .chip{border:1px solid;padding:12px 14px;}
+  .label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;margin-bottom:4px;}
+  .hex{font-size:9px;letter-spacing:.08em;opacity:.7;margin-top:4px;}
+  .status{font-size:12px;}
+  .status-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:2px;font-weight:600;margin-top:6px;}
+</style></head>
+<body>
+  <div class="row">
+    <div class="chip" style="background:#D1FAE5;border-color:#6EE7B7;color:#1A6B45">
+      <div class="label">OK · 達標</div>
+      <div class="status">bg · fg · border</div>
+      <div class="hex">#D1FAE5 / #1A6B45 / #6EE7B7</div>
+    </div>
+    <div class="chip" style="background:#FEF3C7;border-color:#FDE68A;color:#A35200">
+      <div class="label">Warn · 接近</div>
+      <div class="status">bg · fg · border</div>
+      <div class="hex">#FEF3C7 / #A35200 / #FDE68A</div>
+    </div>
+    <div class="chip" style="background:#FEE2E2;border-color:#FECACA;color:#B91C1C">
+      <div class="label">Danger · 落後</div>
+      <div class="status">bg · fg · border</div>
+      <div class="hex">#FEE2E2 / #B91C1C / #FECACA</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+    <span class="status-badge" style="background:#D1FAE5;color:#1A6B45">達標</span>
+    <span class="status-badge" style="background:#FEF3C7;color:#A35200">接近</span>
+    <span class="status-badge" style="background:#FEE2E2;color:#B91C1C">落後</span>
+    <span class="status-badge" style="background:#EAF3DE;color:#3B6D11">100%</span>
+    <span class="status-badge" style="background:#E6F1FB;color:#185FA5">待初審</span>
+    <span class="status-badge" style="background:#EEEDFE;color:#3C3489">翻譯中</span>
+    <span class="status-badge" style="background:#FAEEDA;color:#854F0B">待上架</span>
+    <span class="status-badge" style="background:#EAF3DE;color:#0F6E56">已上架</span>
+  </div>
+</body></html>

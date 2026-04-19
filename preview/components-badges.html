@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#fff;font-family:var(--ist-font-sans);color:var(--ist-ink);}
+  .group{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ist-mute-3);margin:4px 0 8px;font-weight:500}
+  .row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .sbadge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:10px;font-weight:500}
+  .pill{display:inline-block;font-size:10px;padding:2px 6px;border-radius:8px;font-weight:500;white-space:nowrap}
+  .status-tag{font-size:9px;padding:1px 6px;border-radius:2px;font-weight:600}
+</style></head>
+<body>
+  <div class="group">Article status · rounded pill</div>
+  <div class="row">
+    <span class="sbadge" style="background:#E6F1FB;color:#185FA5">待初審</span>
+    <span class="sbadge" style="background:#EEEDFE;color:#3C3489">翻譯中</span>
+    <span class="sbadge" style="background:#FAEEDA;color:#854F0B">待上架</span>
+    <span class="sbadge" style="background:#EAF3DE;color:#0F6E56">已上架</span>
+  </div>
+  <div class="group">Achievement pill · % badge</div>
+  <div class="row">
+    <span class="pill" style="background:#EAF3DE;color:#3B6D11">100%</span>
+    <span class="pill" style="background:#FAEEDA;color:#854F0B">78%</span>
+    <span class="pill" style="background:#FCEBEB;color:#A32D2D">42%</span>
+  </div>
+  <div class="group">Status tag · flat, inline with stat</div>
+  <div class="row">
+    <span class="status-tag" style="background:#D1FAE5;color:#1A6B45">達標</span>
+    <span class="status-tag" style="background:#FEF3C7;color:#A35200">接近</span>
+    <span class="status-tag" style="background:#FEE2E2;color:#B91C1C">落後</span>
+    <span class="status-tag" style="background:#D1FAE5;color:#1A6B45">健康</span>
+    <span class="status-tag" style="background:#FEF3C7;color:#A35200">注意</span>
+    <span class="status-tag" style="background:#FEE2E2;color:#B91C1C">危險</span>
+  </div>
+</body></html>
