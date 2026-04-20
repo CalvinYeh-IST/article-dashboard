@@ -125,7 +125,8 @@ import {
 const FIXED_YEAR = '2026';
 const QS         = ['Q1', 'Q2', 'Q3', 'Q4'];
 const THEMES     = ['文化美食', '自然生態', '常民生活', '藝術文化', '綜覽台灣'];
-// ... 其他常數保持不變
+const REGIONS    = ['北部', '中部', '南部', '東部', '離島'];
+const SEASONS    = ['春', '夏', '秋', '冬'];
 
 // ★ 修改此處：對應您附圖中的正確 KPI 目標
 const KPI_TARGETS = {
@@ -2044,6 +2045,10 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
       markersRef.current.forEach((m) => m.remove());
       markersRef.current.clear();
 
+      // Remove previous route layer/source
+      if (map.getLayer('ist-route-line')) map.removeLayer('ist-route-line');
+      if (map.getSource('ist-route'))     map.removeSource('ist-route');
+
       stops.forEach((s) => {
         const a = s.article;
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
@@ -2079,6 +2084,24 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
           new mapboxgl.LngLatBounds(coords[0], coords[0])
         );
         map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 800 });
+
+        // Draw route polyline
+        map.addSource('ist-route', {
+          type: 'geojson',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
+        });
+        map.addLayer({
+          id: 'ist-route-line',
+          type: 'line',
+          source: 'ist-route',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': '#C8621E',
+            'line-width': 2.5,
+            'line-dasharray': [2, 2],
+            'line-opacity': 0.7,
+          },
+        });
       } else if (coords.length === 1) {
         map.flyTo({ center: coords[0], zoom: 12, duration: 800 });
       }
