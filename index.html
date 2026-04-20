@@ -6,8 +6,7 @@
 <title>IST Content Platform · 看見台灣基金會</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet" />
 
 <style>
   html, body, #root { height: 100%; margin: 0; padding: 0; }
@@ -44,13 +43,14 @@
   .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .line-clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 
-  .leaflet-container { font-family: inherit; background: #EFEFE9 !important; }
-  .leaflet-control-zoom a {
-    background: #fff !important; color: #1C1C1C !important;
+  .mapboxgl-map { font-family: inherit; background: #EFEFE9 !important; }
+  .mapboxgl-ctrl-zoom-in, .mapboxgl-ctrl-zoom-out, .mapboxgl-ctrl-compass {
+    background-color: #fff !important; color: #1C1C1C !important;
     border: 1px solid #E8E8E4 !important;
   }
-  .leaflet-popup-content-wrapper { border-radius: 6px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; }
-  .leaflet-popup-content { margin: 12px 14px !important; font-size: 12px !important; }
+  .mapboxgl-popup-content { border-radius: 6px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; padding: 12px 14px !important; font-size: 12px !important; }
+  .mapboxgl-popup-close-button { font-size: 14px; color: #6B6B6B; padding: 4px 6px; }
+  .mapboxgl-ctrl-attrib { font-size: 9px !important; }
 
   .ist-marker-num {
     background: #C8621E; color: #fff; border: 2px solid #fff; border-radius: 50%;
@@ -87,13 +87,14 @@
   .lock-input { letter-spacing: 0.14em; text-align: center; }
 </style>
 
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+
 <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.3.1",
     "react-dom": "https://esm.sh/react-dom@18.3.1",
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-    "leaflet": "https://esm.sh/leaflet@1.9.4",
     "lucide-react": "https://esm.sh/lucide-react@0.446.0?deps=react@18.3.1",
     "chart.js/auto": "https://esm.sh/chart.js@4.4.4/auto"
   }
@@ -109,7 +110,6 @@
 <script type="text/babel" data-type="module" data-presets="react">
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
-import L from 'leaflet';
 import Chart from 'chart.js/auto';
 import {
   LayoutDashboard, Database, FileText, Map as MapIcon,
@@ -125,14 +125,13 @@ import {
 const FIXED_YEAR = '2026';
 const QS         = ['Q1', 'Q2', 'Q3', 'Q4'];
 const THEMES     = ['文化美食', '自然生態', '常民生活', '藝術文化', '綜覽台灣'];
-const REGIONS    = ['北部', '中部', '南部', '東部', '離島'];
-const SEASONS    = ['春', '夏', '秋', '冬'];
+// ... 其他常數保持不變
 
-// ★ 用戶指定：2026 年 KPI 目標（ZH: 120/年, EN: 80/年，依季平均分配）
+// ★ 修改此處：對應您附圖中的正確 KPI 目標
 const KPI_TARGETS = {
   '2026': {
-    zh: { Q1: 30, Q2: 30, Q3: 30, Q4: 30 },  // 全年 120
-    en: { Q1: 20, Q2: 20, Q3: 20, Q4: 20 },  // 全年 80
+    zh: { Q1: 20, Q2: 60, Q3: 60, Q4: 60 },  // 全年累計 200
+    en: { Q1: 20, Q2: 80, Q3: 80, Q4: 80 },  // 全年累計 260
   },
 };
 
@@ -714,7 +713,6 @@ function StrategicManagement({ articles }) {
             <div className="flex gap-3">
               <HeroStatCell label="中文稿上架" value={cnPub} pctVal={pct(cnPub, total)} accent="#C8621E" />
               <HeroStatCell label="英譯稿上架" value={enPub} pctVal={pct(enPub, total)} accent="#2D2D2D" />
-              <HeroStatCell label="有地理座標" value={articles.filter(hasCoords).length} pctVal={pct(articles.filter(hasCoords).length, total)} accent="#1A6B45" />
             </div>
           </div>
 
@@ -1983,27 +1981,33 @@ function ActivePopover({ stop, onClose }) {
 }
 
 /* ============================================================
-   【K】Leaflet Map component
+   【K】Mapbox GL Map component
+   ============================================================ */
+
+const MAPBOX_TOKEN = localStorage.getItem('mapbox_token') || '';
+const MAPBOX_STYLE = 'mapbox://styles/calvinyeh/cmo6y6xmy00co01rg2qagejhq';
+
+/* ============================================================
+   【K】Mapbox GL Map component
    ============================================================ */
 
 function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
-  const dotsRef      = useRef([]);
-  const markersRef   = useRef(new Map());
+  const markersRef   = useRef(new Map());   // key → mapboxgl.Marker (numbered)
+  const dotsRef      = useRef([]);          // mapboxgl.Marker[] (background dots)
 
-  // Init
+  // Init map
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
-    const map = L.map(containerRef.current, {
-      center: [23.8, 121.0],
-      zoom: 7,
-      zoomControl: true,
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      style: MAPBOX_STYLE,
+      center: [121.0, 23.8],
+      zoom: 6.5,
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd', maxZoom: 19,
-    }).addTo(map);
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
   }, []);
@@ -2011,64 +2015,76 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
   // Faded background dots
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
-    dotsRef.current.forEach((m) => map.removeLayer(m));
-    dotsRef.current = [];
-    const stopIds = new Set(stops.map((s) => s.article.id));
-    geotagged.forEach((a) => {
-      if (stopIds.has(a.id)) return;
-      const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-      if (lat === null || lng === null) return;
-      const marker = L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '', html: '<div class="ist-marker-dot"></div>',
-          iconSize: [10, 10], iconAnchor: [5, 5],
-        }),
-        interactive: true, keyboard: false,
-      }).addTo(map);
-      marker.bindTooltip(a.title, { direction: 'top', offset: [0, -4] });
-      dotsRef.current.push(marker);
-    });
+    const addDots = () => {
+      dotsRef.current.forEach((m) => m.remove());
+      dotsRef.current = [];
+      const stopIds = new Set(stops.map((s) => s.article.id));
+      geotagged.forEach((a) => {
+        if (stopIds.has(a.id)) return;
+        const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+        if (lat === null || lng === null) return;
+        const el = document.createElement('div');
+        el.className = 'ist-marker-dot';
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .setPopup(new mapboxgl.Popup({ offset: 6, closeButton: false })
+            .setHTML(`<div style="font-size:11px;color:#1C1C1C">${escapeHtml(a.title)}</div>`))
+          .addTo(map);
+        dotsRef.current.push(marker);
+      });
+    };
+    if (map.isStyleLoaded()) { addDots(); }
+    else { map.once('load', addDots); }
   }, [geotagged, stops]);
 
   // Numbered itinerary markers
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
-    markersRef.current.forEach((m) => map.removeLayer(m));
-    markersRef.current.clear();
+    const addMarkers = () => {
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current.clear();
 
-    stops.forEach((s) => {
-      const a = s.article;
-      const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-      if (lat === null || lng === null) return;  // Can't plot AI-Estimated without coords
-      const activeCls = activeKey === s.key ? ' active' : '';
-      const estCls    = s.estimated ? ' estimated' : '';
-      const marker = L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '',
-          html: `<div class="ist-marker-num${activeCls}${estCls}">${s.globalIdx}</div>`,
-          iconSize: [28, 28], iconAnchor: [14, 14],
-        }),
-        zIndexOffset: activeKey === s.key ? 1000 : 500,
-      }).addTo(map);
-      marker.bindPopup(
-        `<div style="font-weight:500;font-size:12px;color:#1C1C1C;margin-bottom:3px">Day ${s.day} · ${escapeHtml(a.title)}</div>` +
-        `<div style="font-size:10px;color:#888780">${escapeHtml([a.city, a.area].filter(Boolean).join(' · ') || '')}</div>` +
-        (s.stop.arrival_time ? `<div style="font-size:10px;color:#C8621E;margin-top:3px">抵達 ${escapeHtml(s.stop.arrival_time)}</div>` : ''),
-        { maxWidth: 260 }
-      );
-      marker.on('click', () => onMarkerClick(s.key));
-      markersRef.current.set(s.key, marker);
-    });
+      stops.forEach((s) => {
+        const a = s.article;
+        const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+        if (lat === null || lng === null) return;
+        const activeCls = activeKey === s.key ? ' active' : '';
+        const estCls    = s.estimated ? ' estimated' : '';
+        const el = document.createElement('div');
+        el.className = `ist-marker-num${activeCls}${estCls}`;
+        el.textContent = s.globalIdx;
 
-    // Fit bounds
-    const coords = stops
-      .map((s) => [parseCoord(s.article.lat), parseCoord(s.article.lng)])
-      .filter(([la, ln]) => la !== null && ln !== null);
-    if (coords.length > 1) {
-      map.fitBounds(coords, { padding: [80, 80], maxZoom: 11, animate: true, duration: 0.8 });
-    } else if (coords.length === 1) {
-      map.flyTo(coords[0], 12, { duration: 0.8 });
-    }
+        const popup = new mapboxgl.Popup({ offset: 18, maxWidth: '260px' })
+          .setHTML(
+            `<div style="font-weight:500;font-size:12px;color:#1C1C1C;margin-bottom:3px">Day ${s.day} · ${escapeHtml(a.title)}</div>` +
+            `<div style="font-size:10px;color:#888780">${escapeHtml([a.city, a.area].filter(Boolean).join(' · ') || '')}</div>` +
+            (s.stop.arrival_time ? `<div style="font-size:10px;color:#C8621E;margin-top:3px">抵達 ${escapeHtml(s.stop.arrival_time)}</div>` : '')
+          );
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lng, lat])
+          .setPopup(popup)
+          .addTo(map);
+        el.addEventListener('click', () => onMarkerClick(s.key));
+        markersRef.current.set(s.key, marker);
+      });
+
+      // Fit bounds
+      const coords = stops
+        .map((s) => [parseCoord(s.article.lng), parseCoord(s.article.lat)])
+        .filter(([ln, la]) => ln !== null && la !== null);
+      if (coords.length > 1) {
+        const bounds = coords.reduce(
+          (b, c) => b.extend(c),
+          new mapboxgl.LngLatBounds(coords[0], coords[0])
+        );
+        map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 800 });
+      } else if (coords.length === 1) {
+        map.flyTo({ center: coords[0], zoom: 12, duration: 800 });
+      }
+    };
+    if (map.isStyleLoaded()) { addMarkers(); }
+    else { map.once('load', addMarkers); }
   }, [stops, activeKey, onMarkerClick]);
 
   // FlyTo on active
@@ -2078,9 +2094,9 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
     if (!s) return;
     const lat = parseCoord(s.article.lat), lng = parseCoord(s.article.lng);
     if (lat === null || lng === null) return;
-    map.flyTo([lat, lng], Math.max(map.getZoom(), 12), { duration: 0.9 });
+    map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 12), duration: 900 });
     const marker = markersRef.current.get(activeKey);
-    if (marker) marker.openPopup();
+    if (marker) marker.togglePopup();
   }, [activeKey, stops]);
 
   return <div ref={containerRef} className="w-full h-full" />;
