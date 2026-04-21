@@ -1544,59 +1544,201 @@ function Chip({ children, color = '#F2F1EE', text = '#6B6B6B' }) {
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash-lite'];
 
-const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner.
+const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner. Your job is to select stops from a pre-filtered article database and arrange them into a coherent, geographically logical itinerary.
 
-ABSOLUTE RULES:
-1. LOCATION SOURCE OF TRUTH: The "地點[錨點]" field is the ONLY authoritative location. City names in article content are background context — ignore them for routing.
-2. NO-COORD ARTICLES (座標:無): Treat as located in their stated 地點[錨點]. Group with same-city stops or add to recommended.
-3. GEOGRAPHIC CLUSTERING: Each day must stay within the same county or adjacent townships. Never mix distant regions in one day.
-4. TRAVEL BUFFER: Min 40 minutes between stops. Max 4 stops per day.
-5. DATABASE ONLY: Only use IDs from the provided database. Never invent places.
-6. RECOMMENDED: For articles thematically relevant but cannot be a stop (座標:無 and off-route, or great supplementary reads), add to "recommended" array (max 5, no duplicates with stops).
-If physically impossible, set feasibility="impossible", explain, still provide best realistic alternative.`;
+ABSOLUTE RULES — VIOLATION IS NOT PERMITTED:
+
+1. REGION LOCK 🔒
+   The database has already been pre-filtered to the correct region(s) for this request.
+   NEVER select articles whose 區域 field does not match the user's intended region.
+   - 東部 trips = only 花蓮/台東 articles. NEVER pick 離島, 南部, 北部, or 中部 articles.
+   - 離島 trips = only 離島 articles. NEVER mix 離島 with mainland Taiwan.
+   - 北部/中部/南部 trips = stay in that region. Do not cross into other regions.
+   - If articles from another region appear in the database, SKIP THEM ENTIRELY.
+
+2. CONTENT TYPE MATCHING 🎯
+   The user's stated preferences (e.g. 美食, 自然生態, 文化) MUST drive stop selection.
+   - 美食/小吃/料理 trip → MUST prefer stops where hasSnack=true OR hasStore=true OR subDir contains 料理/食材/食品. Scenic-only articles (hasSight-only, no food tags) should be secondary.
+   - 自然生態 trip → prefer stops where hasSight=true AND theme=自然生態, or subDir contains 山川森林/海洋島嶼.
+   - 文化/歷史 trip → prefer subDir 民俗節慶/宗教信仰/生活型態/地域風土 or hasEvent=true.
+   - 綜合/平衡 trip → mix content types evenly across the days.
+
+3. GEOGRAPHIC CLUSTERING 📍
+   Each day must stay within the same city or adjacent townships.
+   Minimum 40 min travel buffer between stops. Maximum 4 stops per day. Maximum 4 days total.
+
+4. ANCHOR = 地點[錨點] ONLY
+   The 地點[錨點] field (city/area) is the ONLY authoritative location for routing.
+   Article body text mentioning city names is irrelevant — ignore it.
+
+5. DATABASE ONLY
+   Only use integer IDs present in the provided database. Never invent IDs or places.
+
+6. NO-COORD ARTICLES (座標:無)
+   Group with same-city stops, or place in "recommended" array if off-route.
+
+7. RECOMMENDED (max 5, no duplicates with stops)
+   Use for thematically relevant articles that can't be physical stops.
+
+If feasibility is impossible, explain why and still provide the best realistic alternative.`;
+
 
 /**
- * 分析文章資料庫，計算各分類（小吃/店家/伴手禮/景點/活動）的數量分佈。
- * 若使用者需求中提到具體城市，則只計算該城市的文章，讓提問更具針對性。
+ * 從使用者輸入解析「地理意圖」與「內容偏好意圖」
  */
-function computeCategoryStats(articles, queryText = '') {
-  const allCities = [
-    '台北', '新北', '基隆', '桃園', '新竹', '苗栗', '台中',
-    '彰化', '南投', '雲林', '嘉義', '台南', '高雄', '屏東',
-    '宜蘭', '花蓮', '台東', '澎湖', '金門', '馬祖', '綠島', '小琉球',
-  ];
-  const mentionedCities = allCities.filter((c) => queryText.includes(c));
+function detectQueryIntent(queryText) {
+  // 地區關鍵詞 → region 欄位值
+  const REGION_MAP = {
+    '東部': ['東部'], '花蓮': ['東部'], '台東': ['東部'], '太魯閣': ['東部'],
+    '北部': ['北部'], '台北': ['北部'], '新北': ['北部'], '基隆': ['北部'],
+    '桃園': ['北部'], '新竹': ['北部'], '宜蘭': ['北部'], '苗栗': ['北部'],
+    '中部': ['中部'], '台中': ['中部'], '彰化': ['中部'], '南投': ['中部'],
+    '雲林': ['中部'], '嘉義': ['中部'],
+    '南部': ['南部'], '台南': ['南部'], '高雄': ['南部'], '屏東': ['南部'],
+    '離島': ['離島'], '澎湖': ['離島'], '金門': ['離島'], '馬祖': ['離島'],
+    '綠島': ['離島'], '小琉球': ['離島'], '蘭嶼': ['離島'],
+  };
 
-  const pool = mentionedCities.length > 0
-    ? articles.filter((a) => mentionedCities.some((c) =>
-        (a.city || '').includes(c) || (a.area || '').includes(c)
-      ))
-    : articles;
+  // 城市關鍵詞（用來補強 city 欄位篩選）
+  const CITY_MAP = {
+    '台北': '台北', '新北': '新北', '基隆': '基隆', '桃園': '桃園', '新竹': '新竹',
+    '苗栗': '苗栗', '台中': '台中', '彰化': '彰化', '南投': '南投', '雲林': '雲林',
+    '嘉義': '嘉義', '台南': '台南', '高雄': '高雄', '屏東': '屏東', '宜蘭': '宜蘭',
+    '花蓮': '花蓮', '台東': '台東', '澎湖': '澎湖', '金門': '金門', '馬祖': '馬祖',
+  };
+
+  const detectedRegions = new Set();
+  const detectedCities  = [];
+
+  for (const [kw, rs] of Object.entries(REGION_MAP)) {
+    if (queryText.includes(kw)) rs.forEach((r) => detectedRegions.add(r));
+  }
+  for (const [kw, city] of Object.entries(CITY_MAP)) {
+    if (queryText.includes(kw)) detectedCities.push(city);
+  }
+
+  // 內容偏好
+  const FOOD_KW    = ['美食', '小吃', '吃', '料理', '食', '餐', '夜市', '伴手禮', '特產'];
+  const NATURE_KW  = ['自然', '生態', '山', '海', '森林', '峽谷', '瀑布', '野生', '珊瑚'];
+  const CULTURE_KW = ['文化', '歷史', '古蹟', '廟', '藝術', '老街', '傳統', '節慶', '博物館'];
+  const RELAX_KW   = ['輕鬆', '悠閒', '慢旅', '步調', '散步'];
+
+  const isFood    = FOOD_KW.some((k)    => queryText.includes(k));
+  const isNature  = NATURE_KW.some((k)  => queryText.includes(k));
+  const isCulture = CULTURE_KW.some((k) => queryText.includes(k));
+  const isRelax   = RELAX_KW.some((k)   => queryText.includes(k));
 
   return {
-    snack: pool.filter((a) => a.hasSnack).length,
-    store: pool.filter((a) => a.hasStore).length,
-    gift:  pool.filter((a) => a.hasGift).length,
-    sight: pool.filter((a) => a.hasSight).length,
-    event: pool.filter((a) => a.hasEvent).length,
-    total: pool.length,
-    location: mentionedCities.length > 0 ? mentionedCities.join('、') : '全台',
+    regions: [...detectedRegions],
+    cities:  detectedCities,
+    isFood, isNature, isCulture, isRelax,
   };
 }
 
+/**
+ * 根據意圖智慧篩選與排序文章，確保送給 Gemini 的池子地理正確、內容相符。
+ * 這是解決「東部旅遊跑出離島」和「美食之旅全是景點」的核心修復。
+ */
+function buildSmartPool(articles, intent) {
+  const FOOD_SUBDIRS    = new Set(['料理', '食材', '食品', '地方特色']);
+  const NATURE_SUBDIRS  = new Set(['山川森林', '海洋島嶼', '地域風土']);
+  const CULTURE_SUBDIRS = new Set(['民俗節慶', '宗教信仰', '表演', '音樂', '美術', '文學', '人物', '生活型態']);
+
+  // ── 第一步：地理硬篩（最關鍵） ──
+  let geoPool = articles;
+  if (intent.regions.length > 0) {
+    const regionFiltered = articles.filter((a) => {
+      const artRegions = asArr(a.region);
+      return intent.regions.some((r) => artRegions.includes(r));
+    });
+    // 保底：若篩出來太少則退回全庫（避免空行程）
+    geoPool = regionFiltered.length >= 5 ? regionFiltered : articles;
+  }
+
+  // 城市更精確篩選（有城市關鍵詞時，在地區篩選結果上再縮小）
+  if (intent.cities.length > 0 && intent.regions.length > 0) {
+    const cityFiltered = geoPool.filter((a) =>
+      intent.cities.some((c) => (a.city || '').includes(c) || (a.area || '').includes(c))
+    );
+    if (cityFiltered.length >= 5) geoPool = cityFiltered;
+  }
+
+  // ── 第二步：內容偏好排序（軟排，不硬刪） ──
+  const score = (a) => {
+    let s = 0;
+    const subdirs = new Set(asArr(a.subDir));
+
+    if (intent.isFood) {
+      if (a.hasSnack) s += 30;
+      if (a.hasStore) s += 20;
+      if (a.hasGift)  s += 10;
+      if ([...subdirs].some((d) => FOOD_SUBDIRS.has(d)))    s += 15;
+      if (asArr(a.theme).includes('文化美食'))               s += 10;
+    }
+    if (intent.isNature) {
+      if (a.hasSight) s += 20;
+      if ([...subdirs].some((d) => NATURE_SUBDIRS.has(d)))  s += 25;
+      if (asArr(a.theme).includes('自然生態'))               s += 15;
+    }
+    if (intent.isCulture) {
+      if (a.hasEvent) s += 20;
+      if ([...subdirs].some((d) => CULTURE_SUBDIRS.has(d))) s += 25;
+      if (asArr(a.theme).some((t) => ['藝術文化', '常民生活'].includes(t))) s += 15;
+    }
+    // 有座標的文章加分（更容易成為實體停靠站）
+    if (hasRealCoords(a)) s += 5;
+    return s;
+  };
+
+  // 有意圖偏好時排序，無偏好時保持原序
+  const hasIntent = intent.isFood || intent.isNature || intent.isCulture;
+  const sorted = hasIntent
+    ? [...geoPool].sort((a, b) => score(b) - score(a))
+    : geoPool;
+
+  // ── 第三步：限制上限，避免 prompt 過長 ──
+  const withCoords    = sorted.filter(hasRealCoords);
+  const withoutCoords = sorted.filter((a) => !hasRealCoords(a));
+
+  // 有座標全拿（行程骨架），無座標最多 60 篇（推薦用）
+  return [...withCoords, ...withoutCoords.slice(0, 60)];
+}
+
+/**
+ * 分析資料庫分佈（用於 clarify 提問）
+ */
+function computeCategoryStats(articles, queryText = '') {
+  const intent = detectQueryIntent(queryText);
+  const pool   = buildSmartPool(articles, intent);
+  return {
+    snack:    pool.filter((a) => a.hasSnack).length,
+    store:    pool.filter((a) => a.hasStore).length,
+    gift:     pool.filter((a) => a.hasGift).length,
+    sight:    pool.filter((a) => a.hasSight).length,
+    event:    pool.filter((a) => a.hasEvent).length,
+    total:    pool.length,
+    location: intent.cities.length  > 0 ? intent.cities.join('、')
+            : intent.regions.length > 0 ? intent.regions.join('、')
+            : '全台',
+  };
+}
+
+
 /** Build compact article context for Gemini — 假座標視同無座標 */
-function buildArticleContext(articles, maxContentChars = 600) {
+function buildArticleContext(articles, maxContentChars = 400) {
   return articles.map((a) => {
     const parts = [];
     parts.push(`#${a.id} 《${a.title}》`);
     const loc = [a.city, a.area].filter(Boolean).join('/');
     if (loc) parts.push(`地點[錨點]:${loc}`);
     const region = asArr(a.region).join('+');
-    if (region) parts.push(`區域:${region}`);
+    if (region) parts.push(`區域:${region}`);  // ← 讓 Gemini 看到區域標籤
     const theme = asArr(a.theme).join('+');
     if (theme) parts.push(`主題:${theme}`);
+    const subDir = asArr(a.subDir).join('+');
+    if (subDir) parts.push(`子目錄:${subDir}`);  // ← 新增：提供內容類型信號
     const season = asArr(a.season).join('+');
-    if (season) parts.push(`時令:${season}`);
+    if (season && season !== '其他') parts.push(`時令:${season}`);
     const haves = [];
     if (a.hasStore && a.storeKw) haves.push(`店家(${a.storeKw})`);
     if (a.hasSnack && a.snackKw) haves.push(`小吃(${a.snackKw})`);
@@ -1609,29 +1751,21 @@ function buildArticleContext(articles, maxContentChars = 600) {
     } else {
       parts.push('座標:無');
     }
-    if (a.description) parts.push(`描述:${String(a.description).slice(0, 160)}`);
-    if (a.content) {
-      const content = String(a.content).replace(/\s+/g, ' ').trim().slice(0, maxContentChars);
-      parts.push(`內文:${content}`);
-    }
+    if (a.description) parts.push(`描述:${String(a.description).slice(0, 120)}`);
     return parts.join('｜');
   }).join('\n');
 }
 
 async function callGeminiPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
-  // Prioritise articles with coordinates for travel planning, but include some without
-  // so the model can suggest them with "AI Estimated" flag if relevant
-  const withCoords    = articles.filter(hasRealCoords);
-  const withoutCoords = articles.filter((a) => !hasRealCoords(a)).slice(0, 80);
-  const poolArticles  = [...withCoords, ...withoutCoords];
-
-  const context = buildArticleContext(poolArticles, 500);
+  // ── 核心修復：用 buildSmartPool 代替直接切分，確保地理與內容已預先篩選 ──
+  const intent      = detectQueryIntent(userQuery);
+  const poolArticles = buildSmartPool(articles, intent);
+  const context     = buildArticleContext(poolArticles);
 
   let prompt = '';
 
   if (isClarifyPhase) {
     // ── 第一階段：資料庫感知提問 ──
-    // 根據資料庫中實際有的內容分布，產生一個有意義的針對性問題
     const stats = categoryStats || computeCategoryStats(articles, userQuery);
     const available = [
       stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
@@ -1664,12 +1798,25 @@ ${userQuery}
 }`;
   } else {
     // ── 第二階段：依確認偏好輸出行程 ──
+    // 生成意圖摘要，明確告訴 Gemini 這個池子是怎麼來的
+    const intentSummary = [
+      intent.regions.length > 0 && `目標地區：${intent.regions.join('、')}`,
+      intent.cities.length  > 0 && `目標城市：${intent.cities.join('、')}`,
+      intent.isFood    && '使用者偏好：美食/小吃/店家導向，請優先選擇有 hasSnack 或 hasStore 標記的文章',
+      intent.isNature  && '使用者偏好：自然生態導向，請優先選擇 theme=自然生態 或 subDir 含山川/海洋的文章',
+      intent.isCulture && '使用者偏好：文化歷史導向，請優先選擇 subDir 含民俗節慶/宗教/藝術的文章',
+    ].filter(Boolean).join('\n');
+
     prompt = `${PLANNER_SYSTEM_PROMPT}
+
+【 前端已完成的智慧篩選 — 請嚴格遵守 】
+${intentSummary || '無特定地區或內容偏好，請依需求自行判斷'}
+⚠️ 本資料庫已預先篩選至正確地區，若你看到其他地區的文章請完全忽略不用。
 
 【 使用者需求與已確認偏好 】
 ${userQuery}
 
-【 可用文章資料庫 (${poolArticles.length} 篇) 】
+【 可用文章資料庫（已地理篩選，共 ${poolArticles.length} 篇） 】
 ${context}
 
 【 輸出格式要求 】
@@ -1701,11 +1848,13 @@ ${context}
 1. 只能使用上方資料庫中存在的 id（整數）。不要發明 id。
 2. 每天最多 4 站。總共最多 4 天。
 3. 每站之間必須保留至少 40 分鐘交通/緩衝時間（請依台灣實際地理距離判斷）。
-4. 如果使用者的需求（例如「一天玩遍全台」）不可行，設定 feasibility="impossible"，在 message 解釋，但仍在 days 提供最接近的可行替代方案。
-5. 如果需要調整（例如需要更多天數），設定 feasibility="adjusted"，在 message 解釋調整原因。
+4. 如果使用者的需求不可行，設定 feasibility="impossible"，在 message 解釋，但仍在 days 提供最接近的可行替代方案。
+5. 如果需要調整，設定 feasibility="adjusted"，在 message 解釋調整原因。
 6. 只使用資料庫中提供的資料；不要引入資料庫以外的景點。
-7. recommended 放座標:無但主題高度相符的文章，或行程縣市的深度延伸閱讀，最多 5 篇，不得與 stops 重複。
-8. 務必優先符合使用者已確認的偏好（例如：若使用者選擇「主攻小吃」，stops 應以有 hasSnack 標記的地點為主）。`;
+7. recommended 放座標:無但主題高度相符的文章，最多 5 篇，不得與 stops 重複。
+8. 使用者偏好美食時，stops 中至少 2/3 的站點應有 hasSnack=true 或 hasStore=true。
+9. 使用者偏好自然生態時，stops 中的站點應以 theme=自然生態 或 subDir 含山川森林/海洋島嶼為主。
+10. 任何情況下，同一個行程內的所有站點必須在相同或相鄰的縣市，不得跨越不同大區域。`;
   }
 
   let lastErr = null;
