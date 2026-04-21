@@ -1636,6 +1636,49 @@ function detectQueryIntent(queryText) {
 }
 
 /**
+ * 從查詢文字中解析天數。找不到回傳 null。
+ */
+function detectDays(q) {
+  const patterns = [
+    [/一天|1\s*天|half.?day|day.?trip|one.?day/i, 1],
+    [/兩天|二天|2\s*天|two.?day/i, 2],
+    [/三天|3\s*天|three.?day/i, 3],
+    [/四天|4\s*天|four.?day/i, 4],
+    [/五天|5\s*天|five.?day/i, 5],
+    [/六天|6\s*天|six.?day/i, 6],
+    [/七天|一週|一周|7\s*天|a?\s*week/i, 7],
+    [/週末|周末|weekend/i, 2],
+  ];
+  for (const [re, days] of patterns) {
+    if (re.test(q)) return days;
+  }
+  return null;
+}
+
+/**
+ * 判斷查詢是否過於模糊而缺乏風格偏好。
+ * 短查詢、情緒性需求、探索型需求都視為 vague。
+ */
+function isQueryVague(q, intent) {
+  if (intent.isFood || intent.isNature || intent.isCulture) return false; // 已有明確偏好
+  const VAGUE_WORDS = [
+    '沉靜', '放鬆', '療癒', '充電', '慢旅', '散心', '度假',
+    '吃喝玩樂', '有哪些', '有什麼', '推薦', '不知道', '隨便',
+    '都可以', '看看', 'travel', 'trip', 'visit', 'explore',
+    '想來台灣', '來玩', '旅遊', '旅行', '觀光',
+  ];
+  return q.length < 25 || VAGUE_WORDS.some((w) => q.includes(w));
+}
+
+/** 風格選項定義（前端用，不走 AI） */
+const STYLE_OPTIONS = [
+  { key: 'food',    emoji: '🍜', label: '美食小吃', desc: '夜市、料理、在地小吃' },
+  { key: 'nature',  emoji: '🏔️', label: '山海自然', desc: '峽谷、海岸、生態景觀' },
+  { key: 'culture', emoji: '🏛️', label: '文化歷史', desc: '古蹟、廟宇、傳統藝術' },
+  { key: 'mix',     emoji: '✨', label: '綜合探索', desc: '幫我搭配最好的組合' },
+];
+
+/**
  * 根據意圖智慧篩選與排序文章，確保送給 Gemini 的池子地理正確、內容相符。
  * 這是解決「東部旅遊跑出離島」和「美食之旅全是景點」的核心修復。
  */
@@ -2085,6 +2128,85 @@ function PresetsGrid({ onSelect, disabled }) {
   );
 }
 
+/**
+ * 行程規劃前的輕量引導面板。
+ * 只在缺少「天數」或「風格」時才出現，選完自動送出，不需確認按鈕。
+ */
+function PreCheckPanel({ needDays, needStyle, initialDays, onComplete }) {
+  const [days, setDays]   = useState(initialDays || null);
+  const [style, setStyle] = useState(null);
+
+  const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
+
+  // 天數確認後：若不需要風格就直接送出；需要風格就等待下一步
+  const handleDayPick = (d) => {
+    setDays(d);
+    if (!needStyle) onComplete(d, null);
+  };
+
+  // 風格確認後：一律直接送出（最後一步）
+  const handleStylePick = (s) => {
+    setStyle(s);
+    onComplete(days, s);
+  };
+
+  const showStylePicker = needStyle && (!needDays || days !== null);
+
+  return (
+    <div className="ist-fade-in space-y-4">
+      {/* 天數選擇 */}
+      {needDays && (
+        <div>
+          <div className="text-[11px] font-medium text-[#6B6B6B] mb-2 tracking-wide uppercase">
+            Trip Duration
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {DAY_OPTIONS.map((d) => (
+              <button
+                key={d}
+                onClick={() => handleDayPick(d)}
+                className={`px-3 py-1.5 rounded-lg text-[12.5px] font-medium border transition-all duration-150 ${
+                  days === d
+                    ? 'bg-[#C8621E] text-white border-[#C8621E] shadow-sm'
+                    : 'bg-white text-[#3D3D3D] border-[#E2E0DC] hover:border-[#C8621E] hover:text-[#C8621E]'
+                }`}
+              >
+                {d === 7 ? '7 days+' : `${d} day${d > 1 ? 's' : ''}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 風格選擇（天數確認後才顯示，或不需要天數時直接顯示） */}
+      {showStylePicker && (
+        <div className="ist-fade-in">
+          <div className="text-[11px] font-medium text-[#6B6B6B] mb-2 tracking-wide uppercase">
+            Travel Style
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {STYLE_OPTIONS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => handleStylePick(s.key)}
+                className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-all duration-150 ${
+                  style === s.key
+                    ? 'bg-[#FBF0E8] border-[#C8621E]'
+                    : 'bg-white border-[#E2E0DC] hover:border-[#EDB896] hover:bg-[#FBF0E8]/50'
+                }`}
+              >
+                <span className="text-[18px] leading-none mb-0.5">{s.emoji}</span>
+                <span className="text-[12px] font-semibold text-[#1C1C1C]">{s.label}</span>
+                <span className="text-[10px] text-[#9A9A96] leading-tight">{s.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TravelPlanner({ articles }) {
   const [draft, setDraft]           = useState('');
   const [query, setQuery]           = useState('');
@@ -2099,6 +2221,8 @@ function TravelPlanner({ articles }) {
   // ── 對話式提問狀態 ──
   const [clarification, setClarification] = useState(null);  // { message, options }
   const [initialQuery, setInitialQuery]   = useState('');     // 使用者一開始打的需求
+  // ── 前端引導狀態（天數 + 風格，不走 AI） ──
+  const [preCheck, setPreCheck] = useState(null);  // { needDays, needStyle, days }
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -2176,10 +2300,58 @@ function TravelPlanner({ articles }) {
     const q = draft.trim(); if (!q) return;
     const key = localStorage.getItem('gemini_key');
     if (!key) { setApiErr('尚未設定 Gemini API Key，請點右上角齒輪圖示設定'); return; }
+
+    const days    = detectDays(q);
+    const intent  = detectQueryIntent(q);
+    const vague   = isQueryVague(q, intent);
+
+    const needDays  = !days;
+    const needStyle = vague;
+
+    // 缺少天數或風格時，先走前端引導，不呼叫 API
+    if (needDays || needStyle) {
+      setClarification(null);
+      setPreCheck({ needDays, needStyle, days });
+      return;
+    }
+
+    // 資訊充足，直接送出
     setQuery(q);
-    setClarification(null);  // 清掉前一輪的提問
-    runApi(q, key, true);    // 強制進入「提問階段」
+    setClarification(null);
+    setPreCheck(null);
+    runApi(q, key, true);
   };
+
+  /**
+   * PreCheckPanel 完成後的回呼。
+   * 把天數與風格附加到原始查詢，組成更精準的 query，再送給 Gemini。
+   */
+  const handlePreCheckComplete = useCallback((days, style) => {
+    const key = localStorage.getItem('gemini_key');
+    if (!key) return;
+
+    const STYLE_LABELS = {
+      food:    '美食小吃為主',
+      nature:  '山海自然為主',
+      culture: '文化歷史為主',
+      mix:     '綜合體驗，幫我搭配',
+    };
+
+    const additions = [
+      days  && `行程天數：${days}天`,
+      style && style !== 'mix' && `旅遊風格：${STYLE_LABELS[style]}`,
+    ].filter(Boolean);
+
+    const augmented = additions.length > 0
+      ? `${draft.trim()}。${additions.join('，')}`
+      : draft.trim();
+
+    setDraft(augmented);
+    setQuery(augmented);
+    setPreCheck(null);
+    setClarification(null);
+    runApi(augmented, key, true);
+  }, [draft, runApi]);
 
   /* ── 使用者點選選項按鈕 → 合併需求 → 直接要行程 ── */
   const handleOptionSelect = useCallback((opt) => {
@@ -2213,7 +2385,8 @@ function TravelPlanner({ articles }) {
   const reopenInput = () => {
     setInputCollapsed(false); setPlan(null); setActive(null);
     setIsDemo(false); setApiErr('');
-    setClarification(null); setInitialQuery('');  // 清掉對話狀態
+    setClarification(null); setInitialQuery('');
+    setPreCheck(null);
   };
 
   const activeStop = resolvedStops.find((s) => s.key === active);
@@ -2321,13 +2494,22 @@ function TravelPlanner({ articles }) {
                 <div className="py-8 text-center">
                   <Loader2 size={28} className="text-[#C8621E] mx-auto animate-spin" />
                   <div className="text-[12px] text-[#888780] mt-3">
-                    {clarification ? 'AI 正在依你的偏好規劃行程…' : 'AI 正在分析你的需求…'}
+                    {clarification ? 'AI 正在依偏好規劃行程…' : 'AI 正在分析需求…'}
                   </div>
-                  <div className="text-[10px] text-[#9A9A96] mt-1">已載入 {articles.length} 篇文章供 AI 匹配</div>
+                  <div className="text-[10px] text-[#9A9A96] mt-1">已載入 {articles.length} 篇文章</div>
                 </div>
-              ) : (
-                !clarification && <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
-              )}
+              ) : preCheck ? (
+                /* 前端引導面板：天數 + 風格，不走 AI */
+                <PreCheckPanel
+                  needDays={preCheck.needDays}
+                  needStyle={preCheck.needStyle}
+                  initialDays={preCheck.days}
+                  onComplete={handlePreCheckComplete}
+                />
+              ) : !clarification ? (
+                /* 初始狀態：預設卡片 */
+                <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
+              ) : null}
             </div>
           </>
         )}
