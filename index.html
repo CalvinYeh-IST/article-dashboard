@@ -112,7 +112,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createRoot } from 'react-dom/client';
 import Chart from 'chart.js/auto';
 import {
-  LayoutDashboard, Database, FileText, Map as MapIcon, BookOpen,
+  LayoutDashboard, Database, FileText, Map as MapIcon, BookOpen, MessageCircle,
   Search, X, ChevronRight, MapPin, AlertTriangle, Send, Sparkles,
   Clock, Filter, Download, Settings, Lock, KeyRound, Eye, Info,
   TrendingUp, Calendar, Globe, ExternalLink, Loader2, Copy, Check
@@ -185,14 +185,12 @@ function parseCoord(v) {
 }
 const hasCoords = (a) => parseCoord(a.lat) !== null && parseCoord(a.lng) !== null;
 
-/** 排除系統預設中心點假座標（南投 120.962, 23.448），只有真實標註才算有座標 */
-const DUMMY_LAT = 23.448446802266;
-const DUMMY_LNG = 120.96249165306;
-const DUMMY_THRESHOLD = 0.05;
+/** 排除系統預設中心點假座標（南投 120.962, 23.448） */
+const DUMMY_LAT = 23.448446802266, DUMMY_LNG = 120.96249165306, DUMMY_THR = 0.05;
 const hasRealCoords = (a) => {
   if (!hasCoords(a)) return false;
   const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-  return !(Math.abs(lat - DUMMY_LAT) < DUMMY_THRESHOLD && Math.abs(lng - DUMMY_LNG) < DUMMY_THRESHOLD);
+  return !(Math.abs(lat - DUMMY_LAT) < DUMMY_THR && Math.abs(lng - DUMMY_LNG) < DUMMY_THR);
 };
 
 /** 百分比對應顏色與文字，直接從 main.js 移植 */
@@ -591,46 +589,73 @@ function App() {
    ============================================================ */
 
 function Sidebar({ view, onChange, count }) {
+  const sideRef = useRef(null);
   const items = [
     { id: 'strategic', label: '策略與管理', en: 'Strategic & Management', Icon: LayoutDashboard },
     { id: 'data',      label: '數據管理',   en: 'Data Management',        Icon: Database },
     { id: 'article',   label: '文章管理',   en: 'Article Management',     Icon: FileText },
     { id: 'planner',   label: 'AI 行程規劃', en: 'AI Travel Planner',      Icon: MapIcon },
   ];
+  const expand   = () => { if (sideRef.current) sideRef.current.style.width = '240px'; };
+  const collapse = () => { if (sideRef.current) sideRef.current.style.width = '56px';  };
   return (
-    <aside className="w-60 shrink-0 border-r border-[#E2E0DC] bg-white flex flex-col">
-      <div className="px-5 py-6 border-b border-[#E2E0DC]">
-        <div className="ist-eyebrow text-[#C8621E]">IST · 看見台灣基金會</div>
-        <div className="text-[15px] font-medium text-[#1C1C1C] mt-1 tracking-wide">Content Platform</div>
-        <div className="text-[11px] text-[#9A9A96] mt-0.5">Internal Use Only</div>
+    <aside
+      ref={sideRef}
+      onMouseEnter={expand}
+      onMouseLeave={collapse}
+      className="group shrink-0 border-r border-[#E2E0DC] bg-white flex flex-col overflow-hidden"
+      style={{ width: '56px', transition: 'width 0.28s ease' }}
+    >
+      {/* Header */}
+      <div className="border-b border-[#E2E0DC] flex items-center" style={{ minHeight: '68px' }}>
+        <div className="shrink-0 flex items-center justify-center" style={{ width: '56px' }}>
+          <div className="w-7 h-7 rounded bg-[#C8621E] flex items-center justify-center">
+            <span className="text-white text-[10px] font-bold tracking-tight">I</span>
+          </div>
+        </div>
+        <div className="whitespace-nowrap overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-200 pr-5">
+          <div className="ist-eyebrow text-[#C8621E]">IST · 看見台灣基金會</div>
+          <div className="text-[14px] font-medium text-[#1C1C1C] mt-0.5">Content Platform</div>
+          <div className="text-[10px] text-[#9A9A96]">Internal Use Only</div>
+        </div>
       </div>
-      <nav className="flex-1 py-3">
+      {/* Nav */}
+      <nav className="flex-1 py-2">
         {items.map(({ id, label, en, Icon }) => {
           const active = view === id;
           return (
             <button
               key={id}
               onClick={() => onChange(id)}
-              className={`w-full px-5 py-3 flex items-center gap-3 text-left transition-colors border-l-2 ${
+              className={`w-full py-3.5 flex items-center text-left border-l-2 transition-colors ${
                 active
                   ? 'border-[#C8621E] bg-[#FBF0E8] text-[#1C1C1C]'
                   : 'border-transparent text-[#6B6B6B] hover:bg-[#F2F1EE] hover:text-[#1C1C1C]'
               }`}
             >
-              <Icon size={17} strokeWidth={1.5} className={active ? 'text-[#C8621E]' : ''} />
-              <div className="flex-1 min-w-0">
+              <div className="shrink-0 flex items-center justify-center" style={{ width: '54px' }}>
+                <Icon size={17} strokeWidth={1.5} className={active ? 'text-[#C8621E]' : ''} />
+              </div>
+              <div className="flex-1 min-w-0 whitespace-nowrap overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-200 pr-3">
                 <div className="text-[13px] font-medium leading-tight">{label}</div>
                 <div className="text-[9px] uppercase tracking-wider text-[#9A9A96] mt-0.5">{en}</div>
               </div>
-              {active && <ChevronRight size={14} className="text-[#C8621E]" />}
+              {active && (
+                <ChevronRight size={13} className="text-[#C8621E] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-3" />
+              )}
             </button>
           );
         })}
       </nav>
-      <div className="px-5 py-4 border-t border-[#E2E0DC]">
-        <div className="ist-eyebrow">資料庫</div>
-        <div className="text-[22px] font-light text-[#1C1C1C] tracking-tight mt-1">{count}</div>
-        <div className="text-[10px] text-[#9A9A96]">篇文章 · 全資料庫</div>
+      {/* Footer count */}
+      <div className="border-t border-[#E2E0DC] flex items-center" style={{ minHeight: '58px' }}>
+        <div className="shrink-0 flex flex-col items-center justify-center" style={{ width: '56px' }}>
+          <div className="text-[17px] font-light text-[#1C1C1C] tracking-tight">{count}</div>
+        </div>
+        <div className="whitespace-nowrap overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-200 pr-5">
+          <div className="ist-eyebrow text-[#888780]">資料庫</div>
+          <div className="text-[10px] text-[#9A9A96]">篇文章 · 全資料庫</div>
+        </div>
       </div>
     </aside>
   );
@@ -1521,23 +1546,22 @@ const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash
 
 const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner.
 
-ABSOLUTE RULES — follow before anything else:
-1. LOCATION SOURCE OF TRUTH: The "地點[錨點]" field is the ONLY authoritative location for each article. City/county names appearing in article content are background context — never use them to determine geography.
-2. NO-COORD ARTICLES (座標:無): These articles have no GPS. Treat them as located in their stated 地點. Group them with same-city stops or add to recommended reading if off-route.
-3. GEOGRAPHIC CLUSTERING: Each day must stay within the same county or adjacent townships. Never mix Taipei and Kaohsiung in one day.
-4. TRAVEL BUFFER: Minimum 40 minutes between stops. Max 4 stops per day.
+ABSOLUTE RULES:
+1. LOCATION SOURCE OF TRUTH: The "地點[錨點]" field is the ONLY authoritative location. City names in article content are background context — ignore them for routing.
+2. NO-COORD ARTICLES (座標:無): Treat as located in their stated 地點[錨點]. Group with same-city stops or add to recommended.
+3. GEOGRAPHIC CLUSTERING: Each day must stay within the same county or adjacent townships. Never mix distant regions in one day.
+4. TRAVEL BUFFER: Min 40 minutes between stops. Max 4 stops per day.
 5. DATABASE ONLY: Only use IDs from the provided database. Never invent places.
-6. RECOMMENDED READING: For articles that are thematically relevant to the trip but cannot be included as stops (座標:無 and city is far from the route, or simply a great supplementary read), include their IDs in the "recommended" array with a brief reason.
-If a request is physically impossible, set feasibility="impossible", explain in message, and still provide the best realistic alternative.`;
+6. RECOMMENDED: For articles thematically relevant but cannot be a stop (座標:無 and off-route, or great supplementary reads), add to "recommended" array (max 5, no duplicates with stops).
+If physically impossible, set feasibility="impossible", explain, still provide best realistic alternative.`;
 
-/** Build compact article context for Gemini
- *  假座標（南投中心點）視同無座標，不傳 GPS 給 AI，避免誤導動線 */
+/** Build compact article context for Gemini — 假座標視同無座標 */
 function buildArticleContext(articles, maxContentChars = 600) {
   return articles.map((a) => {
     const parts = [];
     parts.push(`#${a.id} 《${a.title}》`);
-    const locationStr = [a.city, a.area].filter(Boolean).join('/');
-    if (locationStr) parts.push(`地點[錨點]:${locationStr}`);
+    const loc = [a.city, a.area].filter(Boolean).join('/');
+    if (loc) parts.push(`地點[錨點]:${loc}`);
     const region = asArr(a.region).join('+');
     if (region) parts.push(`區域:${region}`);
     const theme = asArr(a.theme).join('+');
@@ -1603,10 +1627,7 @@ ${context}
     }
   ],
   "recommended": [
-    {
-      "id": <資料庫文章的 id，整數>,
-      "reason": "為什麼推薦閱讀，15字以內，繁體中文"
-    }
+    { "id": <整數>, "reason": "推薦理由，15字以內" }
   ]
 }
 
@@ -1617,7 +1638,7 @@ ${context}
 4. 如果使用者的需求（例如「一天玩遍全台」）不可行，設定 feasibility="impossible"，在 message 解釋，但仍在 days 提供最接近的可行替代方案。
 5. 如果需要調整（例如需要更多天數），設定 feasibility="adjusted"，在 message 解釋調整原因。
 6. 只使用資料庫中提供的資料；不要引入資料庫以外的景點。
-7. recommended 放「座標:無」但主題高度相符的文章，或行程停留縣市的深度延伸閱讀，最多 5 篇，不得與 stops 重複。`;
+7. recommended 放座標:無但主題高度相符的文章，或行程縣市的深度延伸閱讀，最多 5 篇，不得與 stops 重複。`;
 
   let lastErr = null;
   for (const model of GEMINI_MODELS) {
@@ -1661,283 +1682,463 @@ ${context}
   throw lastErr || new Error('All Gemini models failed');
 }
 
+
+/* ──────────────────────────────────────────────────────────
+   預設行程卡片資料
+────────────────────────────────────────────────────────── */
+const PRESET_ITINERARIES = [
+  {
+    key: 'north-food',
+    title: '北部三天文化美食',
+    subtitle: '台北・基隆・新北',
+    description: '大稻埕老街、九份山城、基隆廟口，深度品味北台灣的歷史人文底蘊',
+    duration: '3天2夜',
+    icon: '🍜',
+    gradFrom: '#FBF0E8', gradTo: '#FDE8D8', accentColor: '#9C4A12',
+    query: '規劃三天兩夜北部文化美食之旅，從台北大稻埕出發，安排九份、基隆廟口等景點，注意地理動線合理',
+  },
+  {
+    key: 'east-nature',
+    title: '東部自然生態兩天',
+    subtitle: '花蓮・台東・太魯閣',
+    description: '太魯閣峽谷、七星潭海岸、縱谷稻田，感受台灣最原始壯麗的山海生態',
+    duration: '2天1夜',
+    icon: '🏔️',
+    gradFrom: '#D1FAE5', gradTo: '#A7F3D0', accentColor: '#1A6B45',
+    query: '規劃兩天一夜東部自然生態之旅，以花蓮為主，安排太魯閣、七星潭等自然景點',
+  },
+  {
+    key: 'taipei-classic',
+    title: '九份＋大稻埕一日',
+    subtitle: '台北・新北・瑞芳',
+    description: '晨遊大稻埕感受老城風情，午後上山俯瞰九份金瓜石的礦山美景',
+    duration: '1天',
+    icon: '⛩️',
+    gradFrom: '#EEEDFE', gradTo: '#DDD6FE', accentColor: '#3C3489',
+    query: '規劃一日遊，上午安排大稻埕迪化街，下午前往九份老街，請依合理時間與地理順序安排',
+  },
+  {
+    key: 'islands-summer',
+    title: '離島夏季行程',
+    subtitle: '澎湖・綠島・小琉球',
+    description: '碧藍珊瑚礁、玄武岩海岸、海龜共泳，打造專屬你的台灣離島夢旅',
+    duration: '3天2夜',
+    icon: '🏝️',
+    gradFrom: '#CFFAFE', gradTo: '#A5F3FC', accentColor: '#0E7490',
+    query: '規劃三天兩夜離島夏季行程，以澎湖或綠島或小琉球等離島為主，重視自然生態與海洋體驗',
+  },
+];
+
+/* ──────────────────────────────────────────────────────────
+   示範行程資料（無 API Key 時使用）
+────────────────────────────────────────────────────────── */
+const DEMO_ARTICLES = {
+  'north-food': {
+    dn1: { id:'dn1', title:'大稻埕迪化街──百年南北貨老街', city:'台北市', area:'大同區', theme:['文化美食'], region:['北部'], lat:25.0577, lng:121.5081, description:'保留清代街屋立面的百年老街，融合傳統南北貨與現代文創選物，是感受台北歷史層次的最佳起點。' },
+    dn2: { id:'dn2', title:'剝皮寮歷史街區', city:'台北市', area:'萬華區', theme:['藝術文化'], region:['北部'], lat:25.0376, lng:121.4998, description:'清代漢人街屋群，現為藝文展演空間，是台北市區保存最完整的清代商業街道。' },
+    dn3: { id:'dn3', title:'九份老街──雨霧山城的懷舊時光', city:'新北市', area:'瑞芳區', theme:['文化美食'], region:['北部'], lat:25.1098, lng:121.8436, description:'因採金礦業而興起的山城聚落，蜿蜒石階與紅燈籠構成令人著迷的迷霧山城景致。' },
+    dn4: { id:'dn4', title:'黃金博物館──礦山歲月的歷史記憶', city:'新北市', area:'瑞芳區', theme:['文化美食'], region:['北部'], lat:25.1112, lng:121.8601, description:'保存日治時代金瓜石採礦設施，以真實礦坑體驗帶領訪客走進百年採金歲月。' },
+    dn5: { id:'dn5', title:'基隆廟口夜市──四代傳承的海港美食聚落', city:'基隆市', area:'仁愛區', theme:['文化美食'], region:['北部'], lat:25.1284, lng:121.7404, description:'圍繞奠濟宮展開的百年夜市，鼎邊趖、天婦羅、滷肉飯是三大必吃指標小吃。' },
+    dn6: { id:'dn6', title:'正濱漁港彩色屋──老漁港的色彩重生', city:'基隆市', area:'中正區', theme:['藝術文化'], region:['北部'], lat:25.1472, lng:121.7762, description:'老舊漁港建築披上鮮豔彩衣，成為北台灣最具識別度的視覺地景。' },
+  },
+  'east-nature': {
+    de1: { id:'de1', title:'太魯閣峽谷──大理石峭壁的地質奇觀', city:'花蓮縣', area:'秀林鄉', theme:['自然生態'], region:['東部'], lat:24.1492, lng:121.6221, description:'立霧溪切割大理石山壁形成的壯麗峽谷，是台灣最具震撼力的地質景觀之一。' },
+    de2: { id:'de2', title:'七星潭──花蓮海岸的礫石灣', city:'花蓮縣', area:'新城鄉', theme:['自然生態'], region:['東部'], lat:24.0285, lng:121.6294, description:'半月形礫石灣，海天一色的開闊景致配上遠方的清水斷崖，是花蓮最美的海岸線。' },
+    de3: { id:'de3', title:'池上縱谷稻田──台灣最美的農業風景', city:'台東縣', area:'池上鄉', theme:['自然生態','常民生活'], region:['東部'], lat:23.1153, lng:121.2203, description:'中央山脈與海岸山脈之間的縱谷平原，金黃稻浪與翠綠山脈構成如畫的田園景致。' },
+    de4: { id:'de4', title:'三仙台──海蝕地形的神話地景', city:'台東縣', area:'成功鎮', theme:['自然生態'], region:['東部'], lat:23.1281, lng:121.4058, description:'離岸小島透過八拱跨海步橋與陸地相連，岩礁上的海蝕壺穴與嶙峋礁岩極具特色。' },
+  },
+  'taipei-classic': {
+    dt1: { id:'dt1', title:'大稻埕迪化街──百年南北貨老街', city:'台北市', area:'大同區', theme:['文化美食'], region:['北部'], lat:25.0577, lng:121.5081, description:'保留清代街屋立面的百年老街，融合傳統南北貨與現代文創選物。' },
+    dt2: { id:'dt2', title:'永樂市場──台灣布料與小吃的聚集地', city:'台北市', area:'大同區', theme:['常民生活','文化美食'], region:['北部'], lat:25.0560, lng:121.5093, description:'地下層是道地台式小吃，樓上是台灣規模最大的布料批發市場，充滿生活氣息。' },
+    dt3: { id:'dt3', title:'九份老街──雨霧山城的懷舊時光', city:'新北市', area:'瑞芳區', theme:['文化美食'], region:['北部'], lat:25.1098, lng:121.8436, description:'因採金礦業而興起的山城聚落，蜿蜒石階與紅燈籠構成令人著迷的迷霧景致。' },
+    dt4: { id:'dt4', title:'水湳洞選煉廠遺址──台灣最壯闊的廢墟景觀', city:'新北市', area:'瑞芳區', theme:['自然生態'], region:['北部'], lat:25.1152, lng:121.8537, description:'俗稱「黃金瀑布」旁的舊式礦石選煉廠廢墟，是台灣最具震撼力的工業遺址。' },
+  },
+  'islands-summer': {
+    di1: { id:'di1', title:'澎湖馬公老街──媽宮城的歷史縱深', city:'澎湖縣', area:'馬公市', theme:['文化美食'], region:['離島'], lat:23.5686, lng:119.5632, description:'台灣最老的石板街之一，四百年歷史的天后宮為全台最古老廟宇，周邊老宅飄散著玄武岩島嶼的滄桑氣息。' },
+    di2: { id:'di2', title:'澎湖玄武岩海岸──火山熔岩的自然藝術', city:'澎湖縣', area:'望安鄉', theme:['自然生態'], region:['離島'], lat:23.3667, lng:119.5167, description:'千萬年前火山噴發形成的六角形玄武岩柱，在海浪拍打下形成台灣獨特的奇岩地景。' },
+    di3: { id:'di3', title:'小琉球花瓶岩──珊瑚礁島的地標', city:'屏東縣', area:'琉球鄉', theme:['自然生態'], region:['南部'], lat:22.3469, lng:120.3827, description:'珊瑚礁上因差異侵蝕形成的花瓶形岩柱，是小琉球最具代表性的地標景觀。' },
+    di4: { id:'di4', title:'小琉球玳瑁海龜共泳體驗', city:'屏東縣', area:'琉球鄉', theme:['自然生態'], region:['南部'], lat:22.3433, lng:120.3800, description:'小琉球海域是台灣密度最高的海龜棲息地，浮潛即可與野生玳瑁近距離共泳。' },
+  },
+};
+
+const DEMO_PLANS = {
+  'north-food': {
+    _isDemo: true,
+    summary: '三天深度探索北台灣的歷史文化與道地美食。第一天漫步大稻埕百年老街與萬華剝皮寮，第二天登上九份山城感受礦山風情，第三天前往基隆品嚐最道地的港都小吃，完整感受台灣北部的人文厚度。',
+    feasibility: 'ok',
+    days: [
+      { day:1, theme:'大稻埕・萬華老城區', stops:[
+        { id:'dn1', arrival_time:'09:00', duration_minutes:120, reason:'清晨人少，是逛迪化街百年老街的最佳時機' },
+        { id:'dn2', arrival_time:'14:00', duration_minutes:90,  reason:'下午探索保存最完整的清代街屋群與藝文特展' },
+      ]},
+      { day:2, theme:'九份・金瓜石山城', stops:[
+        { id:'dn3', arrival_time:'10:00', duration_minutes:150, reason:'避開人潮，沿豎崎路石階漫步感受山城氛圍' },
+        { id:'dn4', arrival_time:'14:00', duration_minutes:90,  reason:'黃金博物館深入了解百年採礦歷史' },
+      ]},
+      { day:3, theme:'基隆・海港風情', stops:[
+        { id:'dn5', arrival_time:'11:00', duration_minutes:90,  reason:'廟口白天版，沙茶火鍋與鼎邊趖不能錯過' },
+        { id:'dn6', arrival_time:'14:00', duration_minutes:60,  reason:'正濱漁港彩色屋，IG 熱點，傍晚光線最美' },
+      ]},
+    ],
+    recommended: [],
+  },
+  'east-nature': {
+    _isDemo: true,
+    summary: '兩天深度體驗東台灣的壯麗山海生態。第一天在花蓮感受太魯閣峽谷的地質震撼與七星潭的礫石灣景，第二天南下台東，在縱谷稻田與三仙台找到與自然共處的節奏。',
+    feasibility: 'ok',
+    days: [
+      { day:1, theme:'花蓮・山與海的交響', stops:[
+        { id:'de1', arrival_time:'09:00', duration_minutes:180, reason:'太魯閣是花蓮首站，建議早上進入避開旅遊車潮' },
+        { id:'de2', arrival_time:'16:00', duration_minutes:90,  reason:'傍晚的七星潭光線最美，礫石灘散步看夕陽' },
+      ]},
+      { day:2, theme:'台東・縱谷與海岸', stops:[
+        { id:'de3', arrival_time:'09:30', duration_minutes:120, reason:'池上縱谷稻田清晨金光最美，搭乘輕型單車是最佳方式' },
+        { id:'de4', arrival_time:'14:30', duration_minutes:90,  reason:'三仙台跨海步橋走完約一小時，海蝕地形嘆為觀止' },
+      ]},
+    ],
+    recommended: [],
+  },
+  'taipei-classic': {
+    _isDemo: true,
+    summary: '一天之內感受台北盆地的兩種極致：上午在大稻埕迪化街的百年南北貨老街與永樂市場裡感受在地生活，搭車至瑞芳後下午登上九份山城，在石板路與紅燈籠間體驗礦山時代的懷舊氛圍。',
+    feasibility: 'ok',
+    days: [
+      { day:1, theme:'大稻埕→九份・老台灣的兩個面貌', stops:[
+        { id:'dt1', arrival_time:'09:00', duration_minutes:90,  reason:'清晨最適合逛老街，人少且可細細品味街屋建築' },
+        { id:'dt2', arrival_time:'11:00', duration_minutes:60,  reason:'永樂市場地下層的台式早午餐不能錯過' },
+        { id:'dt3', arrival_time:'14:00', duration_minutes:150, reason:'搭乘台鐵至瑞芳後轉乘，下午三點前抵達九份最宜' },
+        { id:'dt4', arrival_time:'17:00', duration_minutes:60,  reason:'黃昏時分的水湳洞選煉廠廢墟，光線最具戲劇性' },
+      ]},
+    ],
+    recommended: [],
+  },
+  'islands-summer': {
+    _isDemo: true,
+    summary: '三天探索台灣最美的離島群。第一天在澎湖感受玄武岩地景與百年廟宇文化，第二天抵達小琉球，與野生海龜共泳是難忘的生態體驗，第三天繼續深探小琉球的珊瑚礁岸線。',
+    feasibility: 'ok',
+    days: [
+      { day:1, theme:'澎湖・玄武岩島嶼', stops:[
+        { id:'di1', arrival_time:'10:00', duration_minutes:90,  reason:'馬公老街是認識澎湖歷史的起點' },
+        { id:'di2', arrival_time:'14:00', duration_minutes:120, reason:'玄武岩柱地景搭船或包車前往，是澎湖最獨特的自然景觀' },
+      ]},
+      { day:2, theme:'小琉球・珊瑚礁生態', stops:[
+        { id:'di3', arrival_time:'10:00', duration_minutes:60,  reason:'花瓶岩是小琉球地標，先環島定位後再深度探索' },
+        { id:'di4', arrival_time:'14:00', duration_minutes:120, reason:'下午風浪較小，是浮潛與海龜共泳的最佳時段' },
+      ]},
+    ],
+    recommended: [],
+  },
+};
+
+/* ──────────────────────────────────────────────────────────
+   預設卡片元件
+────────────────────────────────────────────────────────── */
+function PresetsGrid({ onSelect, disabled }) {
+  return (
+    <div>
+      <div className="ist-eyebrow mb-2.5 text-[#888780]">快速預覽 · 點選立即體驗</div>
+      <div className="grid grid-cols-2 gap-2">
+        {PRESET_ITINERARIES.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => !disabled && onSelect(p)}
+            disabled={disabled}
+            className="text-left rounded-xl overflow-hidden border border-white/60 hover:border-[#EDB896] hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: `linear-gradient(135deg, ${p.gradFrom}, ${p.gradTo})` }}
+          >
+            <div className="p-3">
+              <div className="text-[22px] mb-1.5 leading-none">{p.icon}</div>
+              <div className="text-[11.5px] font-semibold text-[#1C1C1C] leading-tight mb-1">{p.title}</div>
+              <div className="text-[9.5px] text-[#6B6B6B] leading-relaxed mb-2 line-clamp-2">{p.description}</div>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-[#888780] truncate">{p.subtitle}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium ml-1 shrink-0"
+                      style={{ background:'rgba(255,255,255,0.75)', color: p.accentColor }}>
+                  {p.duration}
+                </span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 text-[10px] text-[#9A9A96] text-center leading-relaxed">
+        無需 API Key 即可預覽 · 設定後可生成個人化行程
+      </div>
+    </div>
+  );
+}
+
 function TravelPlanner({ articles }) {
-  const [draft, setDraft]     = useState('');
-  const [query, setQuery]     = useState('');
-  const [plan, setPlan]       = useState(null);   // Parsed Gemini result
-  const [busy, setBusy]       = useState(false);
-  const [apiErr, setApiErr]   = useState('');
-  const [active, setActive]   = useState(null);   // active stop index (day-stop composite id)
-  const [hasKey, setHasKey]   = useState(() => !!localStorage.getItem('gemini_key'));
+  const [draft, setDraft]           = useState('');
+  const [query, setQuery]           = useState('');
+  const [plan, setPlan]             = useState(null);
+  const [busy, setBusy]             = useState(false);
+  const [apiErr, setApiErr]         = useState('');
+  const [active, setActive]         = useState(null);
+  const [hasKey, setHasKey]         = useState(() => !!localStorage.getItem('gemini_key'));
+  const [inputCollapsed, setInputCollapsed] = useState(false);
+  const [isDemo, setIsDemo]         = useState(false);
   const abortRef = useRef(null);
 
-  // Re-check key every few seconds (in case user opened settings)
   useEffect(() => {
     const t = setInterval(() => setHasKey(!!localStorage.getItem('gemini_key')), 1500);
     return () => clearInterval(t);
   }, []);
 
-  // Build article lookup by id
   const articleById = useMemo(() => {
     const m = new Map();
     articles.forEach((a) => m.set(a.id, a));
     return m;
   }, [articles]);
 
-  // Flatten plan into stop list with resolved article info
   const resolvedStops = useMemo(() => {
     if (!plan?.days) return [];
+    const demoArts = plan._articles || {};
     const list = [];
     plan.days.forEach((d) => {
       (d.stops || []).forEach((s, j) => {
-        const a = articleById.get(s.id);
-        if (!a) return; // Gemini returned unknown id — silently skip
+        const a = articleById.get(s.id) || demoArts[s.id];
+        if (!a) return;
         list.push({
-          day: d.day,
-          dayTheme: d.theme,
-          order: j + 1,
-          stop: s,
-          article: a,
+          day: d.day, dayTheme: d.theme, order: j + 1,
+          stop: s, article: a,
           estimated: !hasRealCoords(a),
           key: `${d.day}-${j}`,
         });
       });
     });
-    // Number stops 1..N across whole trip
     list.forEach((x, i) => { x.globalIdx = i + 1; });
     return list;
   }, [plan, articleById]);
 
   const geotagged = useMemo(() => articles.filter(hasRealCoords), [articles]);
 
-  const submit = async () => {
-    const q = draft.trim();
-    if (!q) return;
-    const key = localStorage.getItem('gemini_key');
-    if (!key) { setApiErr('尚未設定 Gemini API Key，請點右上角齒輪圖示設定'); return; }
-
-    setQuery(q);
-    setBusy(true);
-    setApiErr('');
-    setPlan(null);
-    setActive(null);
-
+  /* ── submit via API ── */
+  const runApi = useCallback(async (q, key) => {
+    setBusy(true); setApiErr(''); setPlan(null); setActive(null); setIsDemo(false);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
-
     try {
       const { result } = await callGeminiPlanner({
-        userQuery: q,
-        articles,
-        apiKey: key,
-        signal: abortRef.current.signal,
+        userQuery: q, articles, apiKey: key, signal: abortRef.current.signal,
       });
       setPlan(result);
-      if (result?.days?.[0]?.stops?.[0]) {
-        setActive(`${result.days[0].day}-0`);
-      }
+      setInputCollapsed(true);
+      if (result?.days?.[0]?.stops?.[0]) setActive(`${result.days[0].day}-0`);
     } catch (e) {
-      if (e.name !== 'AbortError') {
-        setApiErr(`API 錯誤：${e.message}`);
-      }
-    } finally {
-      setBusy(false);
+      if (e.name !== 'AbortError') setApiErr(`API 錯誤：${e.message}`);
+    } finally { setBusy(false); }
+  }, [articles]);
+
+  const submit = () => {
+    const q = draft.trim(); if (!q) return;
+    const key = localStorage.getItem('gemini_key');
+    if (!key) { setApiErr('尚未設定 Gemini API Key，請點右上角齒輪圖示設定'); return; }
+    setQuery(q); runApi(q, key);
+  };
+
+  /* ── preset card click ── */
+  const handlePresetClick = useCallback((preset) => {
+    const key = localStorage.getItem('gemini_key');
+    setQuery(preset.title);
+    if (key) {
+      setDraft(preset.query);
+      runApi(preset.query, key);
+    } else {
+      const demo = DEMO_PLANS[preset.key];
+      if (!demo) return;
+      setPlan({ ...demo, _articles: DEMO_ARTICLES[preset.key] });
+      setIsDemo(true); setInputCollapsed(true);
+      if (demo.days?.[0]?.stops?.[0]) setActive(`${demo.days[0].day}-0`);
     }
+  }, [runApi]);
+
+  /* ── reopen input (clears results) ── */
+  const reopenInput = () => {
+    setInputCollapsed(false); setPlan(null); setActive(null);
+    setIsDemo(false); setApiErr('');
   };
 
   const activeStop = resolvedStops.find((s) => s.key === active);
 
   return (
     <div className="relative h-full bg-[#F8F7F5] overflow-hidden">
-      {/* Map full-bleed */}
+      {/* Map */}
       <div className="absolute inset-0">
-        <PlannerMap
-          geotagged={geotagged}
-          stops={resolvedStops}
-          activeKey={active}
-          onMarkerClick={setActive}
-        />
+        <PlannerMap geotagged={geotagged} stops={resolvedStops} activeKey={active} onMarkerClick={setActive} />
       </div>
+
+      {/* Floating reopen button — top-left of visible map area */}
+      {inputCollapsed && (
+        <button
+          onClick={reopenInput}
+          title="重新輸入行程需求"
+          className="absolute z-[600] w-10 h-10 rounded-full bg-white shadow-lg border border-[#E2E0DC] flex items-center justify-center text-[#C8621E] hover:bg-[#FBF0E8] transition-colors ist-fade-in"
+          style={{ top: '16px', left: '390px' }}
+        >
+          <MessageCircle size={16} strokeWidth={1.5} />
+        </button>
+      )}
 
       {/* Left glass panel */}
       <aside className="absolute top-0 left-0 bottom-0 w-[380px] z-[500] flex flex-col ist-glass">
-        <div className="px-5 py-5 border-b border-white/50">
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-white/50 shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#C8621E] flex items-center justify-center shadow-md">
+            <div className="w-8 h-8 rounded-full bg-[#C8621E] flex items-center justify-center shadow-md shrink-0">
               <Sparkles size={15} strokeWidth={1.75} className="text-white" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="ist-eyebrow text-[#C8621E]">AI Travel Planner</div>
               <div className="text-[15px] font-medium text-[#1C1C1C] leading-tight">AI 行程規劃</div>
             </div>
-          </div>
-          <p className="text-[11px] text-[#888780] mt-3 leading-relaxed">
-            描述你想要的台灣旅程，AI 會根據 <strong className="text-[#1C1C1C] font-medium">{articles.length}</strong> 篇文章（其中 <strong className="text-[#1C1C1C] font-medium">{geotagged.length}</strong> 個有精確座標）為你規劃可行的行程。
-          </p>
-          {!hasKey && (
-            <div className="mt-3 px-2.5 py-1.5 rounded-md bg-[#FAEEDA] text-[#854F0B] text-[11px] flex items-start gap-1.5">
-              <KeyRound size={12} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-              <span>請先點擊右上角齒輪圖示設定 Gemini API Key</span>
-            </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="px-5 py-4 border-b border-white/50">
-          <div className="relative">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
-              }}
-              disabled={busy}
-              placeholder="例：規劃三天兩夜北部文化美食之旅，或 想去離島看自然生態"
-              className="w-full text-[13px] p-3 pr-12 border border-[#E2E0DC] bg-white/80 rounded-lg resize-none focus:outline-none focus:border-[#C8621E] placeholder:text-[#9A9A96] disabled:opacity-60"
-              rows={3}
-            />
-            <button
-              onClick={submit}
-              disabled={!draft.trim() || busy}
-              className="absolute right-2 bottom-2 w-8 h-8 rounded-md bg-[#C8621E] text-white flex items-center justify-center hover:bg-[#9C4A12] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="生成行程"
-            >
-              {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} strokeWidth={1.75} />}
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {['北部三天文化美食', '東部自然生態兩天', '九份 + 大稻埕一天', '離島夏季行程'].map((q) => (
-              <button
-                key={q}
-                onClick={() => setDraft(q)}
-                disabled={busy}
-                className="text-[10px] px-2 py-1 rounded-full bg-white/70 border border-[#E2E0DC] hover:bg-[#FBF0E8] hover:border-[#EDB896] hover:text-[#9C4A12] text-[#6B6B6B] disabled:opacity-50 transition-colors"
-              >{q}</button>
-            ))}
+            {isDemo && (
+              <span className="text-[9px] px-2 py-0.5 bg-[#FEF3C7] text-[#A35200] font-medium rounded-full border border-[#FDE68A] shrink-0">
+                範例行程
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Result scroll area */}
-        <div className="flex-1 overflow-y-auto">
-          {apiErr && (
-            <div className="mx-5 mt-4 px-3 py-2.5 bg-[#FEE2E2] border border-[#FECACA] text-[11px] text-[#B91C1C] rounded">
-              {apiErr}
-            </div>
-          )}
-
-          {!plan && !busy && !apiErr && (
-            <div className="px-5 py-6 text-center">
-              <Globe size={32} strokeWidth={1.25} className="text-[#C8621E] mx-auto opacity-60" />
-              <div className="text-[12px] text-[#888780] mt-3 leading-relaxed">
-                輸入你的旅行需求，AI 會從資料庫中<br />挑選相符的地點並規劃行程順序。
+        {/* ── INPUT MODE (no plan yet) ── */}
+        {!inputCollapsed && !plan && (
+          <>
+            <div className="px-5 py-4 border-b border-white/50 shrink-0">
+              <div className="relative">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }}}
+                  disabled={busy}
+                  placeholder="例：規劃三天兩夜北部文化美食之旅"
+                  className="w-full text-[13px] p-3 pr-12 border border-[#E2E0DC] bg-white/80 rounded-lg resize-none focus:outline-none focus:border-[#C8621E] placeholder:text-[#9A9A96] disabled:opacity-60"
+                  rows={3}
+                />
+                <button
+                  onClick={submit}
+                  disabled={!draft.trim() || busy}
+                  className="absolute right-2 bottom-2 w-8 h-8 rounded-md bg-[#C8621E] text-white flex items-center justify-center hover:bg-[#9C4A12] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} strokeWidth={1.75} />}
+                </button>
               </div>
-            </div>
-          )}
-
-          {busy && (
-            <div className="px-5 py-8 text-center">
-              <Loader2 size={28} className="text-[#C8621E] mx-auto animate-spin" />
-              <div className="text-[12px] text-[#888780] mt-3">AI 正在規劃行程，可能需要 10–30 秒…</div>
-              <div className="text-[10px] text-[#9A9A96] mt-1">已載入 {articles.length} 篇文章供 AI 匹配</div>
-            </div>
-          )}
-
-          {plan && (
-            <>
-              {/* Summary */}
-              <div className="px-5 py-3 border-b border-white/50">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Sparkles size={11} strokeWidth={1.75} className="text-[#C8621E]" />
-                  <span className="ist-eyebrow">「{query}」</span>
+              {!hasKey && (
+                <div className="mt-2 px-2.5 py-1.5 rounded-md bg-[#FAEEDA] text-[#854F0B] text-[11px] flex items-start gap-1.5">
+                  <KeyRound size={12} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+                  <span>請點右上角齒輪設定 Gemini API Key，或直接點選下方卡片預覽範例</span>
                 </div>
-                {plan.feasibility && plan.feasibility !== 'ok' && (
-                  <div className={`mb-2 px-2 py-1.5 rounded text-[11px] leading-relaxed ${
-                    plan.feasibility === 'impossible'
-                      ? 'bg-[#FEE2E2] text-[#B91C1C]'
-                      : 'bg-[#FEF3C7] text-[#A35200]'
-                  }`}>
-                    <div className="flex items-start gap-1.5">
-                      <AlertTriangle size={11} strokeWidth={2} className="mt-0.5 shrink-0" />
-                      <span>{plan.message || (plan.feasibility === 'impossible' ? '此行程在時間內不可行，以下為建議替代方案。' : '已依實際距離調整行程。')}</span>
-                    </div>
-                  </div>
-                )}
-                {plan.summary && (
-                  <p className="text-[12px] text-[#1C1C1C] leading-relaxed">{plan.summary}</p>
-                )}
+              )}
+              {apiErr && (
+                <div className="mt-2 px-3 py-2 bg-[#FEE2E2] border border-[#FECACA] text-[11px] text-[#B91C1C] rounded">
+                  {apiErr}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {busy ? (
+                <div className="py-8 text-center">
+                  <Loader2 size={28} className="text-[#C8621E] mx-auto animate-spin" />
+                  <div className="text-[12px] text-[#888780] mt-3">AI 正在規劃行程，約需 10–30 秒…</div>
+                  <div className="text-[10px] text-[#9A9A96] mt-1">已載入 {articles.length} 篇文章供 AI 匹配</div>
+                </div>
+              ) : (
+                <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── RESULT MODE (plan exists, input collapsed) ── */}
+        {plan && (
+          <div className="flex-1 overflow-y-auto">
+            {/* Summary */}
+            <div className="px-5 py-3 border-b border-white/50">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Sparkles size={11} strokeWidth={1.75} className="text-[#C8621E]" />
+                <span className="ist-eyebrow">「{query}」</span>
               </div>
-
-              {/* Days & timeline */}
-              {plan.days?.map((d) => (
-                <div key={d.day} className="px-5 py-4 border-b border-white/50">
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-[#C8621E] text-white rounded">Day {d.day}</span>
-                    {d.theme && <span className="text-[12px] text-[#1C1C1C] font-medium">{d.theme}</span>}
-                  </div>
-                  <ol className="relative">
-                    <div className="absolute left-[11px] top-3 bottom-3 w-[1.5px] bg-[#E2E0DC]" />
-                    {(d.stops || []).map((s, j) => {
-                      const a = articleById.get(s.id);
-                      if (!a) return null;
-                      const key = `${d.day}-${j}`;
-                      return (
-                        <TimelineCard
-                          key={key}
-                          itemKey={key}
-                          index={resolvedStops.find((x) => x.key === key)?.globalIdx || j + 1}
-                          stop={s}
-                          article={a}
-                          active={active === key}
-                          onEnter={() => setActive(key)}
-                        />
-                      );
-                    })}
-                  </ol>
-                </div>
-              ))}
-
-              {/* Recommended reading */}
-              {plan.recommended?.length > 0 && (
-                <div className="px-5 py-4">
-                  <div className="flex items-center gap-1.5 mb-3">
-                    <BookOpen size={13} strokeWidth={1.5} className="text-[#C8621E]" />
-                    <span className="ist-eyebrow text-[#C8621E]">推薦閱讀</span>
-                    <span className="text-[10px] text-[#9A9A96] ml-1">與行程主題相符的延伸文章</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {plan.recommended.map((rec) => {
-                      const a = articleById.get(rec.id);
-                      if (!a) return null;
-                      return (
-                        <div key={rec.id} className="bg-white/70 border border-[#E2E0DC] rounded-lg px-3 py-2.5 hover:bg-white hover:border-[#EDB896] transition-all">
-                          <div className="flex items-start gap-2">
-                            <FileText size={11} strokeWidth={1.5} className="text-[#C8621E] mt-0.5 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[12px] font-medium text-[#1C1C1C] leading-snug line-clamp-2">{a.title}</div>
-                              <div className="text-[10px] text-[#9A9A96] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                {(a.city || a.area) && (
-                                  <span className="inline-flex items-center gap-0.5">
-                                    <MapPin size={9} strokeWidth={1.5} />{[a.city, a.area].filter(Boolean).join(' · ')}
-                                  </span>
-                                )}
-                                {asArr(a.theme).slice(0, 1).map((t) => (
-                                  <span key={t} className="px-1.5 py-px bg-[#EEEDFE] text-[#3C3489] rounded-sm text-[9px]">{t}</span>
-                                ))}
-                              </div>
-                              {rec.reason && (
-                                <div className="text-[10.5px] text-[#6B6B6B] mt-1 italic leading-relaxed">{rec.reason}</div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+              {plan.feasibility && plan.feasibility !== 'ok' && (
+                <div className={`mb-2 px-2 py-1.5 rounded text-[11px] leading-relaxed ${
+                  plan.feasibility === 'impossible' ? 'bg-[#FEE2E2] text-[#B91C1C]' : 'bg-[#FEF3C7] text-[#A35200]'
+                }`}>
+                  <div className="flex items-start gap-1.5">
+                    <AlertTriangle size={11} strokeWidth={2} className="mt-0.5 shrink-0" />
+                    <span>{plan.message || (plan.feasibility === 'impossible' ? '此行程不可行，以下為替代方案。' : '已依實際距離調整行程。')}</span>
                   </div>
                 </div>
               )}
-            </>
-          )}
-        </div>
+              {plan.summary && <p className="text-[12px] text-[#1C1C1C] leading-relaxed">{plan.summary}</p>}
+            </div>
+
+            {/* Days & timeline */}
+            {plan.days?.map((d) => (
+              <div key={d.day} className="px-5 py-4 border-b border-white/50">
+                <div className="flex items-baseline gap-2 mb-3">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 bg-[#C8621E] text-white rounded">Day {d.day}</span>
+                  {d.theme && <span className="text-[12px] text-[#1C1C1C] font-medium">{d.theme}</span>}
+                </div>
+                <ol className="relative">
+                  <div className="absolute left-[11px] top-3 bottom-3 w-[1.5px] bg-[#E2E0DC]" />
+                  {(d.stops || []).map((s, j) => {
+                    const demoArts = plan._articles || {};
+                    const a = articleById.get(s.id) || demoArts[s.id];
+                    if (!a) return null;
+                    const key = `${d.day}-${j}`;
+                    return (
+                      <TimelineCard
+                        key={key} itemKey={key}
+                        index={resolvedStops.find((x) => x.key === key)?.globalIdx || j + 1}
+                        stop={s} article={a}
+                        active={active === key}
+                        onEnter={() => setActive(key)}
+                      />
+                    );
+                  })}
+                </ol>
+              </div>
+            ))}
+
+            {/* Recommended reading */}
+            {plan.recommended?.length > 0 && (
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <BookOpen size={13} strokeWidth={1.5} className="text-[#C8621E]" />
+                  <span className="ist-eyebrow text-[#C8621E]">推薦閱讀</span>
+                  <span className="text-[10px] text-[#9A9A96] ml-1">與行程主題相符的延伸文章</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {plan.recommended.map((rec) => {
+                    const a = articleById.get(rec.id);
+                    if (!a) return null;
+                    return (
+                      <div key={rec.id} className="bg-white/70 border border-[#E2E0DC] rounded-lg px-3 py-2.5 hover:bg-white hover:border-[#EDB896] transition-all">
+                        <div className="flex items-start gap-2">
+                          <FileText size={11} strokeWidth={1.5} className="text-[#C8621E] mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[12px] font-medium text-[#1C1C1C] leading-snug line-clamp-2">{a.title}</div>
+                            <div className="text-[10px] text-[#9A9A96] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {(a.city || a.area) && (
+                                <span className="inline-flex items-center gap-0.5">
+                                  <MapPin size={9} strokeWidth={1.5} />{[a.city, a.area].filter(Boolean).join(' · ')}
+                                </span>
+                              )}
+                              {asArr(a.theme).slice(0, 1).map((t) => (
+                                <span key={t} className="px-1.5 py-px bg-[#EEEDFE] text-[#3C3489] rounded-sm text-[9px]">{t}</span>
+                              ))}
+                            </div>
+                            {rec.reason && <div className="text-[10.5px] text-[#6B6B6B] mt-1 italic">{rec.reason}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </aside>
 
       {/* Active popover */}
@@ -2123,7 +2324,7 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
 
       stops.forEach((s) => {
         const a = s.article;
-        if (!hasRealCoords(a)) return;   // 假座標不顯示 marker
+        if (!hasRealCoords(a)) return;
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
         const activeCls = activeKey === s.key ? ' active' : '';
         const estCls    = s.estimated ? ' estimated' : '';
@@ -2146,7 +2347,7 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
         markersRef.current.set(s.key, marker);
       });
 
-      // Fit bounds — 只用真實座標
+      // Fit bounds — 真實座標only
       const coords = stops
         .filter((s) => hasRealCoords(s.article))
         .map((s) => [parseCoord(s.article.lng), parseCoord(s.article.lat)]);
@@ -2187,7 +2388,7 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
     const map = mapRef.current; if (!map || !activeKey) return;
     const s = stops.find((x) => x.key === activeKey);
     if (!s) return;
-    if (!hasRealCoords(s.article)) return;  // 假座標不飛
+    if (!hasRealCoords(s.article)) return;
     const lat = parseCoord(s.article.lat), lng = parseCoord(s.article.lng);
     map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 12), duration: 900 });
     const marker = markersRef.current.get(activeKey);
