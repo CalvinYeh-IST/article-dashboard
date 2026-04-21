@@ -1878,6 +1878,7 @@ function TravelPlanner({ articles }) {
   const [hasKey, setHasKey]         = useState(() => !!localStorage.getItem('gemini_key'));
   const [inputCollapsed, setInputCollapsed] = useState(false);
   const [isDemo, setIsDemo]         = useState(false);
+  const [detailArticle, setDetailArticle] = useState(null);
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -2093,6 +2094,7 @@ function TravelPlanner({ articles }) {
                         stop={s} article={a}
                         active={active === key}
                         onEnter={() => setActive(key)}
+                        onOpenDetail={() => setDetailArticle(a)} //
                       />
                     );
                   })}
@@ -2113,7 +2115,9 @@ function TravelPlanner({ articles }) {
                     const a = articleById.get(rec.id);
                     if (!a) return null;
                     return (
-                      <div key={rec.id} className="bg-white/70 border border-[#E2E0DC] rounded-lg px-3 py-2.5 hover:bg-white hover:border-[#EDB896] transition-all">
+                      <div key={rec.id} 
+                      onClick={() => setDetailArticle(a)} //
+                      className="bg-white/70 border border-[#E2E0DC] rounded-lg px-3 py-2.5 hover:bg-white hover:border-[#EDB896] transition-all cursor-pointer"> //
                         <div className="flex items-start gap-2">
                           <FileText size={11} strokeWidth={1.5} className="text-[#C8621E] mt-0.5 shrink-0" />
                           <div className="flex-1 min-w-0">
@@ -2143,15 +2147,28 @@ function TravelPlanner({ articles }) {
 
       {/* Active popover */}
       {activeStop && (
-        <div className="absolute bottom-6 right-6 w-[340px] z-[500] ist-glass rounded-xl overflow-hidden ist-fade-in">
-          <ActivePopover stop={activeStop} onClose={() => setActive(null)} />
+        <div className="absolute bottom-6 right-6 w-[340px] z-[500] ist-glass rounded-xl overflow-hidden ist-fade-in shadow-lg">
+          {/* 👇 補上 onOpenDetail 屬性 */}
+          <ActivePopover 
+            stop={activeStop} 
+            onClose={() => setActive(null)} 
+            onOpenDetail={() => setDetailArticle(activeStop.article)} 
+          />
         </div>
+      )}
+
+      {/* 👇 新增這段：當有文章被點擊時，跳出完整文章彈窗 */}
+      {detailArticle && (
+        <ArticleDetailModal 
+          article={detailArticle} 
+          onClose={() => setDetailArticle(null)} 
+        />
       )}
     </div>
   );
 }
 
-function TimelineCard({ itemKey, index, stop, article, active, onEnter }) {
+function TimelineCard({ itemKey, index, stop, article, active, onEnter, onOpenDetail }) {
   const a = article;
   const geo = hasCoords(a);
   return (
@@ -2172,6 +2189,7 @@ function TimelineCard({ itemKey, index, stop, article, active, onEnter }) {
       <div className={`rounded-lg px-3 py-2.5 transition-all border ${
         active ? 'bg-white border-[#EDB896] shadow-md' : 'bg-white/60 border-transparent hover:bg-white hover:border-[#E2E0DC]'
       }`}>
+      onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="text-[12.5px] font-medium text-[#1C1C1C] leading-snug line-clamp-2 flex-1" title={a.title}>
             {a.title}
@@ -2214,13 +2232,17 @@ function TimelineCard({ itemKey, index, stop, article, active, onEnter }) {
   );
 }
 
-function ActivePopover({ stop, onClose }) {
+function ActivePopover({ stop, onClose, onOpenDetail }) {
   const a = stop.article;
   return (
-    <div className="ist-fade-in">
+    // 1. 最外層加上 onClick 點擊事件，以及 group、cursor-pointer 讓滑鼠游標變手指
+    <div className="ist-fade-in group cursor-pointer" onClick={onOpenDetail}>
       {a.image_url && (
-        <img src={a.image_url} alt="" className="w-full h-32 object-cover"
-          onError={(e) => { e.target.style.display = 'none'; }} />
+        // 2. 圖片外層加上 overflow-hidden，圖片加上 hover:scale-105 產生放大特效
+        <div className="relative overflow-hidden">
+          <img src={a.image_url} alt="" className="w-full h-32 object-cover transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => { e.target.style.display = 'none'; }} />
+        </div>
       )}
       <div className="p-4">
         <div className="flex justify-between items-start mb-2 gap-2">
@@ -2229,9 +2251,11 @@ function ActivePopover({ stop, onClose }) {
               <span className="w-5 h-5 rounded-full bg-[#C8621E] text-white flex items-center justify-center text-[9px] font-semibold">{stop.globalIdx}</span>
               <span className="ist-eyebrow text-[#C8621E]">Day {stop.day} · {stop.stop.arrival_time || ''}</span>
             </div>
-            <div className="text-[13px] font-medium text-[#1C1C1C] leading-snug">{a.title}</div>
+            {/* 3. 標題加上 group-hover:text-[#C8621E]，滑鼠移過去時文字會變橘色 */}
+            <div className="text-[13px] font-medium text-[#1C1C1C] leading-snug group-hover:text-[#C8621E] transition-colors">{a.title}</div>
           </div>
-          <button onClick={onClose} className="shrink-0 w-6 h-6 flex items-center justify-center text-[#6B6B6B] hover:text-[#1C1C1C]">
+          {/* 4. 關閉按鈕加上 e.stopPropagation()，確保點擊「X」時只會關閉卡片，不會觸發打開文章 */}
+          <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="shrink-0 w-6 h-6 flex items-center justify-center text-[#6B6B6B] hover:text-[#1C1C1C] bg-white/50 rounded-full">
             <X size={13} strokeWidth={1.5} />
           </button>
         </div>
@@ -2245,10 +2269,18 @@ function ActivePopover({ stop, onClose }) {
           </div>
         )}
         {a.description && (
-          <p className="text-[11px] text-[#6B6B6B] leading-relaxed line-clamp-4">
+          // 這裡把 line-clamp-4 改成 3，讓下方有空間放按鈕
+          <p className="text-[11px] text-[#6B6B6B] leading-relaxed line-clamp-3">
             {a.description}
           </p>
         )}
+
+        {/* 5. 新增底部「閱讀文章庫全文」的提示字樣，引導使用者點擊 */}
+        <div className="mt-3 pt-2 border-t border-[#F2F1EE] flex justify-end">
+          <span className="text-[10px] font-medium text-[#C8621E] flex items-center gap-1 group-hover:text-[#9C4A12] transition-colors">
+            閱讀文章庫全文 <ChevronRight size={11} strokeWidth={2} />
+          </span>
+        </div>
       </div>
     </div>
   );
