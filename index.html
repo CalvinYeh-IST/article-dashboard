@@ -112,7 +112,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createRoot } from 'react-dom/client';
 import Chart from 'chart.js/auto';
 import {
-  LayoutDashboard, Database, FileText, Map as MapIcon,
+  LayoutDashboard, Database, FileText, Map as MapIcon, BookOpen,
   Search, X, ChevronRight, MapPin, AlertTriangle, Send, Sparkles,
   Clock, Filter, Download, Settings, Lock, KeyRound, Eye, Info,
   TrendingUp, Calendar, Globe, ExternalLink, Loader2, Copy, Check
@@ -188,7 +188,7 @@ const hasCoords = (a) => parseCoord(a.lat) !== null && parseCoord(a.lng) !== nul
 /** 排除系統預設中心點假座標（南投 120.962, 23.448），只有真實標註才算有座標 */
 const DUMMY_LAT = 23.448446802266;
 const DUMMY_LNG = 120.96249165306;
-const DUMMY_THRESHOLD = 0.05; // 約 5km 容錯半徑
+const DUMMY_THRESHOLD = 0.05;
 const hasRealCoords = (a) => {
   if (!hasCoords(a)) return false;
   const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
@@ -1521,21 +1521,21 @@ const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash
 
 const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner.
 
-ABSOLUTE RULES — follow these before anything else:
-1. LOCATION SOURCE OF TRUTH: The "地點(city/area)" field in each article is the ONLY authoritative location. Any city or county name appearing in article content/description is background context — NEVER use it to determine where the article's location is.
-2. NO-COORD ARTICLES: Articles marked "座標:無" have no GPS data. Treat them as located in their stated city/area. Do NOT move them elsewhere. Group them with same-city stops.
-3. GEOGRAPHIC CLUSTERING: Each day's stops must be within the same county or adjacent townships. Never schedule Taipei and Kaohsiung on the same day.
-4. TRAVEL BUFFER: Minimum 40 minutes between stops. 4 stops per day maximum.
-5. DATABASE ONLY: Only use article IDs from the provided database. Never invent locations.
+ABSOLUTE RULES — follow before anything else:
+1. LOCATION SOURCE OF TRUTH: The "地點[錨點]" field is the ONLY authoritative location for each article. City/county names appearing in article content are background context — never use them to determine geography.
+2. NO-COORD ARTICLES (座標:無): These articles have no GPS. Treat them as located in their stated 地點. Group them with same-city stops or add to recommended reading if off-route.
+3. GEOGRAPHIC CLUSTERING: Each day must stay within the same county or adjacent townships. Never mix Taipei and Kaohsiung in one day.
+4. TRAVEL BUFFER: Minimum 40 minutes between stops. Max 4 stops per day.
+5. DATABASE ONLY: Only use IDs from the provided database. Never invent places.
+6. RECOMMENDED READING: For articles that are thematically relevant to the trip but cannot be included as stops (座標:無 and city is far from the route, or simply a great supplementary read), include their IDs in the "recommended" array with a brief reason.
 If a request is physically impossible, set feasibility="impossible", explain in message, and still provide the best realistic alternative.`;
 
 /** Build compact article context for Gemini
- *  假座標（南投中心點）視同無座標，不傳給 AI，避免誤導動線 */
+ *  假座標（南投中心點）視同無座標，不傳 GPS 給 AI，避免誤導動線 */
 function buildArticleContext(articles, maxContentChars = 600) {
   return articles.map((a) => {
     const parts = [];
     parts.push(`#${a.id} 《${a.title}》`);
-    // 地點永遠放第一，且加上 [地點錨點] 標記強調權威性
     const locationStr = [a.city, a.area].filter(Boolean).join('/');
     if (locationStr) parts.push(`地點[錨點]:${locationStr}`);
     const region = asArr(a.region).join('+');
@@ -1551,7 +1551,6 @@ function buildArticleContext(articles, maxContentChars = 600) {
     if (a.hasSight && a.sightKw) haves.push(`景點(${a.sightKw})`);
     if (a.hasEvent && a.eventKw) haves.push(`活動(${a.eventKw})`);
     if (haves.length) parts.push(haves.join(' '));
-    // 只傳真實座標；假座標（南投中心點）標記為無，避免 AI 誤判距離
     if (hasRealCoords(a)) {
       parts.push(`座標:(${parseCoord(a.lat).toFixed(3)},${parseCoord(a.lng).toFixed(3)})`);
     } else {
@@ -1602,16 +1601,23 @@ ${context}
         }
       ]
     }
+  ],
+  "recommended": [
+    {
+      "id": <資料庫文章的 id，整數>,
+      "reason": "為什麼推薦閱讀，15字以內，繁體中文"
+    }
   ]
 }
 
 規則：
 1. 只能使用上方資料庫中存在的 id（整數）。不要發明 id。
-2. 每天最多 5 站。總共最多 4 天。
+2. 每天最多 4 站。總共最多 4 天。
 3. 每站之間必須保留至少 40 分鐘交通/緩衝時間（請依台灣實際地理距離判斷）。
 4. 如果使用者的需求（例如「一天玩遍全台」）不可行，設定 feasibility="impossible"，在 message 解釋，但仍在 days 提供最接近的可行替代方案。
 5. 如果需要調整（例如需要更多天數），設定 feasibility="adjusted"，在 message 解釋調整原因。
-6. 只使用資料庫中提供的資料；不要引入資料庫以外的景點。`;
+6. 只使用資料庫中提供的資料；不要引入資料庫以外的景點。
+7. recommended 放「座標:無」但主題高度相符的文章，或行程停留縣市的深度延伸閱讀，最多 5 篇，不得與 stops 重複。`;
 
   let lastErr = null;
   for (const model of GEMINI_MODELS) {
@@ -1692,7 +1698,7 @@ function TravelPlanner({ articles }) {
           order: j + 1,
           stop: s,
           article: a,
-          estimated: !hasRealCoords(a),  // 假座標也視為 estimated
+          estimated: !hasRealCoords(a),
           key: `${d.day}-${j}`,
         });
       });
@@ -1766,7 +1772,7 @@ function TravelPlanner({ articles }) {
             </div>
           </div>
           <p className="text-[11px] text-[#888780] mt-3 leading-relaxed">
-            描述你想要的台灣旅程，AI 會根據 <strong className="text-[#1C1C1C] font-medium">{articles.length}</strong> 篇文章（其中 {geotagged.length} 個有地理座標）為你規劃可行的行程。
+            描述你想要的台灣旅程，AI 會根據 <strong className="text-[#1C1C1C] font-medium">{articles.length}</strong> 篇文章（其中 <strong className="text-[#1C1C1C] font-medium">{geotagged.length}</strong> 個有精確座標）為你規劃可行的行程。
           </p>
           {!hasKey && (
             <div className="mt-3 px-2.5 py-1.5 rounded-md bg-[#FAEEDA] text-[#854F0B] text-[11px] flex items-start gap-1.5">
@@ -1889,6 +1895,46 @@ function TravelPlanner({ articles }) {
                   </ol>
                 </div>
               ))}
+
+              {/* Recommended reading */}
+              {plan.recommended?.length > 0 && (
+                <div className="px-5 py-4">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <BookOpen size={13} strokeWidth={1.5} className="text-[#C8621E]" />
+                    <span className="ist-eyebrow text-[#C8621E]">推薦閱讀</span>
+                    <span className="text-[10px] text-[#9A9A96] ml-1">與行程主題相符的延伸文章</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {plan.recommended.map((rec) => {
+                      const a = articleById.get(rec.id);
+                      if (!a) return null;
+                      return (
+                        <div key={rec.id} className="bg-white/70 border border-[#E2E0DC] rounded-lg px-3 py-2.5 hover:bg-white hover:border-[#EDB896] transition-all">
+                          <div className="flex items-start gap-2">
+                            <FileText size={11} strokeWidth={1.5} className="text-[#C8621E] mt-0.5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[12px] font-medium text-[#1C1C1C] leading-snug line-clamp-2">{a.title}</div>
+                              <div className="text-[10px] text-[#9A9A96] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                {(a.city || a.area) && (
+                                  <span className="inline-flex items-center gap-0.5">
+                                    <MapPin size={9} strokeWidth={1.5} />{[a.city, a.area].filter(Boolean).join(' · ')}
+                                  </span>
+                                )}
+                                {asArr(a.theme).slice(0, 1).map((t) => (
+                                  <span key={t} className="px-1.5 py-px bg-[#EEEDFE] text-[#3C3489] rounded-sm text-[9px]">{t}</span>
+                                ))}
+                              </div>
+                              {rec.reason && (
+                                <div className="text-[10.5px] text-[#6B6B6B] mt-1 italic leading-relaxed">{rec.reason}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2077,7 +2123,7 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
 
       stops.forEach((s) => {
         const a = s.article;
-        if (!hasRealCoords(a)) return;   // 跳過假座標，不在地圖上顯示
+        if (!hasRealCoords(a)) return;   // 假座標不顯示 marker
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
         const activeCls = activeKey === s.key ? ' active' : '';
         const estCls    = s.estimated ? ' estimated' : '';
