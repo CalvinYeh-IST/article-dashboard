@@ -2169,59 +2169,78 @@ function TravelPlanner({ articles }) {
 }
 
 function TimelineCard({ itemKey, index, stop, article, active, onEnter, onOpenDetail }) {
-  const a = article;
-  // 修正：確保使用您 index.html 定義的實體座標判斷函數
-  const geo = hasRealCoords(a); 
+  // 1. 重要修正：優先從 stop.article 抓取資料，確保資料與該筆行程綁定，不被外部變數干擾
+  const a = stop.article || article; 
+  
+  // 2. 使用您檔案中定義的座標判斷邏輯 (hasRealCoords)
+  const geo = typeof hasRealCoords === 'function' ? hasRealCoords(a) : (a.lat && a.lng);
 
   return (
     <li
       onMouseEnter={onEnter}
-      className={`relative pl-9 pb-3 cursor-pointer ist-fade-in`}
+      // 3. 確保點擊事件在 li 標籤內，且防止事件冒泡
+      onClick={(e) => { 
+        e.stopPropagation(); 
+        onOpenDetail(); 
+      }}
+      className={`relative pl-9 pb-3 cursor-pointer ist-fade-in group`}
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
-      {/* 數字圓圈 */}
+      {/* 左側數字圖示 */}
       <div
-        className={`absolute left-0 top-1 w-[23px] h-[23px] rounded-full flex items-center justify-center text-[10px] font-semibold transition-all border-2 border-white ${
+        className={`absolute left-0 top-1 w-[23px] h-[23px] rounded-full flex items-center justify-center text-[10px] font-semibold transition-all border-2 border-white z-10 ${
           active ? 'bg-[#9C4A12] text-white scale-110' : 'bg-[#C8621E] text-white'
         }`}
-        style={{ boxShadow: active ? '0 4px 16px rgba(200,98,30,0.45)' : '0 1px 3px rgba(0,0,0,0.15)' }}
+        style={{ boxShadow: active ? '0 4px 12px rgba(200,98,30,0.3)' : '0 1px 3px rgba(0,0,0,0.1)' }}
       >
         {index}
       </div>
 
-      {/* 內容卡片：onClick 必須在 > 之前 */}
+      {/* 時間軸連接線 */}
+      <div className="absolute left-[11px] top-6 bottom-0 w-[1px] bg-[#E8E8E4] last:hidden"></div>
+
+      {/* 卡片內容主體 */}
       <div 
-        onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
         className={`rounded-lg px-3 py-2.5 transition-all border ${
-          active ? 'bg-white border-[#EDB896] shadow-md' : 'bg-white/60 border-transparent hover:bg-white hover:border-[#E2E0DC]'
+          active 
+            ? 'bg-white border-[#EDB896] shadow-md' 
+            : 'bg-white/60 border-transparent hover:bg-white hover:border-[#E2E0DC]'
         }`}
       >
         <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="text-[12.5px] font-medium text-[#1C1C1C] leading-snug line-clamp-2 flex-1" title={a.title}>
-            {a.title}
+          <div className="flex-1 min-w-0">
+            {/* 標題：確保顯示的是當前物件 a 的標題 */}
+            <div className={`text-[12.5px] font-medium leading-snug line-clamp-2 transition-colors ${
+              active ? 'text-[#9C4A12]' : 'text-[#1C1C1C] group-hover:text-[#C8621E]'
+            }`}>
+              {a.title}
+            </div>
           </div>
+          
+          {/* 如果是 AI 預估座標則顯示警告圖示 */}
           {!geo && (
-            <div title="座標缺失" className="shrink-0 w-5 h-5 rounded-full bg-[#FEF3C7] flex items-center justify-center">
+            <div title="座標預估中" className="shrink-0 w-5 h-5 rounded-full bg-[#FEF3C7] flex items-center justify-center">
               <AlertTriangle size={10} strokeWidth={2} className="text-[#A35200]" />
             </div>
           )}
         </div>
         
-        <div className="flex items-center gap-2 text-[10px] text-[#888780] mb-1">
-          {stop.arrival_time && (
-            <span className="inline-flex items-center gap-0.5">
-              <Clock size={10} strokeWidth={1.5} />{stop.arrival_time}
-            </span>
-          )}
-          {stop.duration_minutes && <span>· {stop.duration_minutes} 分鐘</span>}
-          <span className="truncate ml-auto">
+        {/* 時間與地點資訊 */}
+        <div className="flex items-center gap-2 text-[10px] text-[#888780] mb-1.5">
+          <span className="flex items-center gap-0.5">
+            <Clock size={10} strokeWidth={1.5} />
+            {stop.stop?.arrival_time || '未定時'}
+          </span>
+          <span className="w-1 h-1 rounded-full bg-[#D3D1C7]"></span>
+          <span className="truncate">
             <MapPin size={10} strokeWidth={1.5} className="inline mr-0.5" />
-            {[a.city, a.area].filter(Boolean).join(' · ') || '（未註記）'}
+            {[a.city, a.area].filter(Boolean).join(' · ') || '未註記地點'}
           </span>
         </div>
         
+        {/* 行程理由 */}
         {stop.reason && (
-          <p className="text-[10.5px] text-[#6B6B6B] leading-relaxed line-clamp-3 mb-1.5 italic">
+          <p className="text-[10.5px] text-[#6B6B6B] leading-relaxed line-clamp-2 italic border-l-2 border-[#F1EFE8] pl-2 mt-1">
             {stop.reason}
           </p>
         )}
