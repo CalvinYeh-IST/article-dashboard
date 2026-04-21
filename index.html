@@ -2271,6 +2271,11 @@ function TravelPlanner({ articles }) {
   const [initialQuery, setInitialQuery]   = useState('');     // 使用者一開始打的需求
   // ── 前端引導狀態（天數 + 風格，不走 AI） ──
   const [preCheck, setPreCheck] = useState(null);  // { needDays, needStyle, days }
+  // ── 手機底部 Sheet 狀態 ──
+  const [sheetExpanded, setSheetExpanded] = useState(true);
+  const touchStartY    = useRef(null);   // touch 起始 Y
+  const stopRefs       = useRef({});     // key → DOM node，用來 scrollIntoView
+  const sheetBodyRef   = useRef(null);   // 可滾動的 body 區域
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -2412,6 +2417,33 @@ function TravelPlanner({ articles }) {
     runApi(combined, key, false);  // 已取得偏好，直接要行程
   }, [initialQuery, runApi]);
 
+  /* ── 手機底部 Sheet：touch 手勢 + 點擊切換 ── */
+  const toggleSheet = useCallback(() => setSheetExpanded((v) => !v), []);
+
+  const handleTouchStart = useCallback((e) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (touchStartY.current === null) return;
+    const delta = e.changedTouches[0].clientY - touchStartY.current;
+    if (delta > 32)  setSheetExpanded(false);  // 下滑 → 收合
+    if (delta < -32) setSheetExpanded(true);   // 上滑 → 展開
+    touchStartY.current = null;
+  }, []);
+
+  /* ── 地圖標記點擊：桌面版直接 setActive，手機版展開 sheet 並 scroll ── */
+  const handleMarkerClick = useCallback((key) => {
+    setActive(key);
+    if (window.innerWidth < 768) {
+      setSheetExpanded(true);
+      setTimeout(() => {
+        const el = stopRefs.current[key];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 360);  // 等 sheet 展開動畫完成
+    }
+  }, []);
+
   /* ── preset card click ── */
   const handlePresetClick = useCallback((preset) => {
     const key = localStorage.getItem('gemini_key');
@@ -2435,25 +2467,32 @@ function TravelPlanner({ articles }) {
     setIsDemo(false); setApiErr('');
     setClarification(null); setInitialQuery('');
     setPreCheck(null);
+    setSheetExpanded(true);  // 重新開啟時確保面板展開
   };
 
   const activeStop = resolvedStops.find((s) => s.key === active);
   const isMobile   = useMobile();
 
-  /* ── 行動裝置：面板底部高度（含 56px 底部導覽列） ── */
-  const mobileBottom   = 56;   // bottom nav height
-  const mobilePanelMax = isMobile
-    ? (plan && inputCollapsed ? '56vh' : '68vh')
-    : undefined;
+  // 手機：固定面板高度，用 translateY 控制收合（比 maxHeight 動畫更順滑）
+  const MOBILE_BOTTOM  = 56;            // 底部導覽列高度 px
+  const COLLAPSED_H    = 72;            // 收合時露出的高度 px（handle + header）
+  const PANEL_H_VH     = 65;           // 展開時面板高度 vh
+  const panelTranslate = isMobile && !sheetExpanded
+    ? `calc(${PANEL_H_VH}vh - ${COLLAPSED_H}px)` : '0px';
 
   return (
     <div className="relative h-full bg-[#F8F7F5] overflow-hidden">
       {/* Map — full-screen background */}
       <div className="absolute inset-0">
-        <PlannerMap geotagged={geotagged} stops={resolvedStops} activeKey={active} onMarkerClick={setActive} />
+        <PlannerMap
+          geotagged={geotagged}
+          stops={resolvedStops}
+          activeKey={active}
+          onMarkerClick={handleMarkerClick}
+        />
       </div>
 
-      {/* Floating reopen button */}
+      {/* Floating reopen button (shown when input panel is collapsed/hidden) */}
       {inputCollapsed && (
         <button
           onClick={reopenInput}
@@ -2468,35 +2507,71 @@ function TravelPlanner({ articles }) {
         </button>
       )}
 
-      {/* Glass panel — left rail on desktop / bottom sheet on mobile */}
+      {/* ═══ Glass panel ═══
+          Desktop  : left side rail (380px)
+          Mobile   : bottom sheet with snap animation              */}
       <aside
         className={`absolute z-[500] flex flex-col ist-glass ${
           isMobile
             ? 'left-0 right-0 rounded-t-2xl'
             : 'top-0 left-0 bottom-0 w-[380px]'
         }`}
-        style={isMobile
-          ? { bottom: mobileBottom, maxHeight: mobilePanelMax, overflowY: 'hidden' }
-          : {}
-        }
+        style={isMobile ? {
+          bottom:     MOBILE_BOTTOM,
+          height:     `${PANEL_H_VH}vh`,
+          transform:  `translateY(${panelTranslate})`,
+          transition: 'transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          overflow:   'hidden',
+        } : {}}
       >
-        {/* Handle bar (mobile only) */}
-        {isMobile && <div className="ist-sheet-handle" />}
 
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-white/50 shrink-0">
+        {/* ── Handle + touch zone (mobile only) ── */}
+        {isMobile && (
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onClick={toggleSheet}
+            className="shrink-0 flex flex-col items-center pt-2 pb-0 cursor-pointer select-none"
+            style={{ touchAction: 'none' }}
+          >
+            <div className="ist-sheet-handle" />
+          </div>
+        )}
+
+        {/* ── Header ── */}
+        <div
+          className={`px-5 py-3.5 border-b border-white/50 shrink-0 ${isMobile ? 'cursor-pointer' : ''}`}
+          onTouchStart={isMobile ? handleTouchStart : undefined}
+          onTouchEnd={isMobile ? handleTouchEnd : undefined}
+          onClick={isMobile ? toggleSheet : undefined}
+        >
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[#C8621E] flex items-center justify-center shadow-md shrink-0">
               <Sparkles size={15} strokeWidth={1.75} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="ist-eyebrow text-[#C8621E]">AI Travel Planner</div>
-              <div className="text-[15px] font-medium text-[#1C1C1C] leading-tight">AI 行程規劃</div>
+              <div className="text-[15px] font-medium text-[#1C1C1C] leading-tight">
+                {/* 收合時顯示行程摘要，展開時顯示標題 */}
+                {isMobile && !sheetExpanded && plan
+                  ? `${plan.days?.length ?? 0} 天 · ${resolvedStops.length} 站`
+                  : 'AI 行程規劃'
+                }
+              </div>
             </div>
-            {isDemo && (
+            {isDemo && !isMobile && (
               <span className="text-[9px] px-2 py-0.5 bg-[#FEF3C7] text-[#A35200] font-medium rounded-full border border-[#FDE68A] shrink-0">
                 範例行程
               </span>
+            )}
+            {/* 手機版：chevron 指示展開/收合方向 */}
+            {isMobile && (
+              <ChevronRight
+                size={16} strokeWidth={1.5}
+                className={`text-[#9A9A96] shrink-0 transition-transform duration-300 ${
+                  sheetExpanded ? 'rotate-90' : '-rotate-90'
+                }`}
+              />
             )}
           </div>
         </div>
@@ -2559,7 +2634,7 @@ function TravelPlanner({ articles }) {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div ref={sheetBodyRef} className="flex-1 overflow-y-auto px-4 py-4">
               {busy ? (
                 <div className="py-8 text-center">
                   <Loader2 size={28} className="text-[#C8621E] mx-auto animate-spin" />
@@ -2569,7 +2644,6 @@ function TravelPlanner({ articles }) {
                   <div className="text-[10px] text-[#9A9A96] mt-1">已載入 {articles.length} 篇文章</div>
                 </div>
               ) : preCheck ? (
-                /* 前端引導面板：天數 + 風格，不走 AI */
                 <PreCheckPanel
                   needDays={preCheck.needDays}
                   needStyle={preCheck.needStyle}
@@ -2577,8 +2651,8 @@ function TravelPlanner({ articles }) {
                   onComplete={handlePreCheckComplete}
                 />
               ) : !clarification ? (
-                /* 初始狀態：預設卡片 */
-                <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
+                /* 手機版收合時隱藏預設卡片，避免干擾地圖 */
+                (!isMobile || sheetExpanded) && <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
               ) : null}
             </div>
           </>
@@ -2621,14 +2695,16 @@ function TravelPlanner({ articles }) {
                     if (!a) return null;
                     const key = `${d.day}-${j}`;
                     return (
-                      <TimelineCard
-                        key={key} itemKey={key}
-                        index={resolvedStops.find((x) => x.key === key)?.globalIdx || j + 1}
-                        stop={s} article={a}
-                        active={active === key}
-                        onEnter={() => setActive(key)}
-                        onOpenDetail={() => setDetailArticle(a)} //
-                      />
+                      <div key={key} ref={(el) => { stopRefs.current[key] = el; }}>
+                        <TimelineCard
+                          itemKey={key}
+                          index={resolvedStops.find((x) => x.key === key)?.globalIdx || j + 1}
+                          stop={s} article={a}
+                          active={active === key}
+                          onEnter={() => setActive(key)}
+                          onOpenDetail={() => setDetailArticle(a)}
+                        />
+                      </div>
                     );
                   })}
                 </ol>
@@ -2678,13 +2754,9 @@ function TravelPlanner({ articles }) {
         )}
       </aside>
 
-      {/* Active popover — top on mobile (above sheet), bottom-right on desktop */}
-      {activeStop && (
-        <div className={`absolute z-[600] ist-glass rounded-xl overflow-hidden ist-fade-in shadow-lg ${
-          isMobile
-            ? 'top-3 left-3 right-3'
-            : 'bottom-6 right-6 w-[340px]'
-        }`}>
+      {/* Active popover — desktop only; mobile uses the bottom sheet */}
+      {activeStop && !isMobile && (
+        <div className="absolute bottom-6 right-6 w-[340px] z-[600] ist-glass rounded-xl overflow-hidden ist-fade-in shadow-lg">
           <ActivePopover
             stop={activeStop}
             onClose={() => setActive(null)}
