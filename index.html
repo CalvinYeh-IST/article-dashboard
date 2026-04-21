@@ -100,19 +100,46 @@
 
   /* Dot state (default / low zoom) */
   .ist-pin-dot {
+    position: relative;
     width: 10px; height: 10px;
-    background: rgba(154,154,150,0.6);
+    background: rgba(154,154,150,0.55);
     border: 1.5px solid rgba(255,255,255,0.85);
     border-radius: 50%;
     box-shadow: 0 1px 4px rgba(0,0,0,0.18);
     transition: width 0.35s ease, height 0.35s ease,
                 background 0.35s ease, border-color 0.35s ease;
   }
-  /* Pulsing state (zoom >= 11) */
+
+  /* ── Radar wave animation (zoom >= 11) ──
+     ::before = wave 1 (faster),  ::after = wave 2 (delayed)
+     Both radiate from the dot center outward and fade.           */
+  @keyframes ist-radar-wave {
+    0%   { transform: scale(1);   opacity: 0.75; }
+    100% { transform: scale(5);   opacity: 0;    }
+  }
+  @keyframes ist-dot-beat {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.35); }
+  }
+
   .ist-article-pin.pulsing .ist-pin-dot {
-    background: rgba(200,98,30,0.22);
-    border-color: rgba(200,98,30,0.55);
-    animation: ist-pulse 1.9s ease-in-out infinite;
+    width: 12px; height: 12px;
+    background: #C8621E;
+    border-color: rgba(255,255,255,0.95);
+    box-shadow: 0 0 0 2px rgba(200,98,30,0.25);
+    animation: ist-dot-beat 1.8s ease-in-out infinite;
+  }
+  .ist-article-pin.pulsing .ist-pin-dot::before,
+  .ist-article-pin.pulsing .ist-pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid #C8621E;
+    animation: ist-radar-wave 2.2s ease-out infinite;
+  }
+  .ist-article-pin.pulsing .ist-pin-dot::after {
+    animation-delay: 1.1s;   /* staggered = continuous dual-ring radar */
   }
 
   /* Card state (zoom >= 13) */
@@ -1117,12 +1144,7 @@ function RateCell({ langLabel, langColor, act, tgt, p, noBorder }) {
     <div className={`px-4 py-2.5 ${noBorder ? '' : 'border-r border-[#F2F1EE]'}`} title={`${langLabel}：${act} / ${tgt} 篇 (${p}%)`}>
       <div className="flex justify-between items-center mb-1">
         <span className="text-[10px] font-medium tracking-wider" style={{ color: langColor }}>{langLabel}</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[16px] font-light tracking-tight" style={{ color: pctColor(p) }}>{p}%</span>
-          <span className="text-[9px] px-1.5 py-px font-semibold" style={{ background: pctBg(p), color: pctColor(p) }}>
-            {pctText(p)}
-          </span>
-        </div>
+        <span className="text-[16px] font-light tracking-tight" style={{ color: pctColor(p) }}>{p}%</span>
       </div>
       <div className="h-[3px] bg-[#F2F1EE] overflow-hidden">
         <div className="h-full transition-all duration-500" style={{ width: `${Math.min(100, p)}%`, background: langColor }} />
@@ -2377,6 +2399,15 @@ function TravelPlanner({ articles }) {
     return m;
   }, [articles]);
 
+  // ── React ↔ Mapbox 橋接：讓純 HTML popup 能打開文章彈窗 ──
+  useEffect(() => {
+    window.openMapArticle = (id) => {
+      const art = articleById.get(id) || articleById.get(String(id)) || articleById.get(Number(id));
+      if (art) setDetailArticle(art);
+    };
+    return () => { delete window.openMapArticle; };
+  }, [articleById]);
+
   const resolvedStops = useMemo(() => {
     if (!plan?.days) return [];
     const demoArts = plan._articles || {};
@@ -3060,6 +3091,7 @@ function buildDotElement(a) {
 
 /**
  * 建立點位 popup 的 HTML — 160px 寬，1:1 縮圖 + 標題 + 地點。
+ * onclick 透過 window.openMapArticle 橋接 React setDetailArticle。
  */
 function buildDotPopupHtml(a) {
   const title = escapeHtml(a.title || '');
@@ -3073,7 +3105,8 @@ function buildDotPopupHtml(a) {
        </div>`
     : `<div style="width:100%;aspect-ratio:1/1;background:#FBF0E8;display:flex;align-items:center;justify-content:center;font-size:36px;color:#C8621E">🗺️</div>`;
 
-  return `<div>
+  return `<div onclick="window.openMapArticle && window.openMapArticle(${Number(a.id)})"
+               style="cursor:pointer">
     ${imgBlock}
     <div style="padding:8px 10px 10px">
       <div style="font-size:11.5px;font-weight:500;color:#1C1C1C;line-height:1.45;
@@ -3088,6 +3121,11 @@ function buildDotPopupHtml(a) {
            </div>`
         : ''
       }
+      <div style="font-size:10px;color:#C8621E;margin-top:6px;display:flex;
+                  align-items:center;gap:3px;font-family:-apple-system,'PingFang TC',sans-serif">
+        <span>閱讀文章</span>
+        <span style="font-size:12px">›</span>
+      </div>
     </div>
   </div>`;
 }
