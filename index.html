@@ -83,8 +83,18 @@
   /* Article content highlight match colour (IST prescribed) */
   .ist-kw-hit { font-weight: 700; color: #E24B4A; }
 
+  /* Mobile bottom-sheet handle */
+  .ist-sheet-handle {
+    width: 36px; height: 4px;
+    background: rgba(0,0,0,0.12); border-radius: 2px;
+    margin: 10px auto 2px; flex-shrink: 0;
+  }
+  /* Safe-area padding (iOS notch / home indicator) */
+  .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px); }
+
   /* Lock screen */
   .lock-input { letter-spacing: 0.14em; text-align: center; }
+
 </style>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
@@ -454,7 +464,7 @@ function SettingsGear() {
     <>
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        className="fixed top-4 right-5 w-9 h-9 rounded-full bg-white border border-[#D3D1C7] flex items-center justify-center text-[#6B6B6B] hover:bg-[#F2F1EE] z-[200] shadow-sm"
+        className="fixed top-3 right-3 md:top-4 md:right-5 w-9 h-9 rounded-full bg-white border border-[#D3D1C7] flex items-center justify-center text-[#6B6B6B] hover:bg-[#F2F1EE] z-[800] shadow-sm"
         title="API 設定"
       >
         <Settings size={15} strokeWidth={1.5} />
@@ -506,6 +516,17 @@ function SettingsGear() {
       )}
     </>
   );
+}
+
+/** 偵測是否為行動裝置（< 768px）以切換 RWD 佈局 */
+function useMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
 }
 
 /* ============================================================
@@ -599,13 +620,15 @@ function Sidebar({ view, onChange, count }) {
   const expand   = () => { if (sideRef.current) sideRef.current.style.width = '240px'; };
   const collapse = () => { if (sideRef.current) sideRef.current.style.width = '56px';  };
   return (
-    <aside
-      ref={sideRef}
-      onMouseEnter={expand}
-      onMouseLeave={collapse}
-      className="group shrink-0 border-r border-[#E2E0DC] bg-white flex flex-col overflow-hidden"
-      style={{ width: '56px', transition: 'width 0.28s ease' }}
-    >
+    <>
+      {/* ── Desktop: left icon-rail (hover-expand) ── */}
+      <aside
+        ref={sideRef}
+        onMouseEnter={expand}
+        onMouseLeave={collapse}
+        className="hidden md:flex group shrink-0 border-r border-[#E2E0DC] bg-white flex-col overflow-hidden"
+        style={{ width: '56px', transition: 'width 0.28s ease' }}
+      >
       {/* Header */}
       <div className="border-b border-[#E2E0DC] flex items-center" style={{ minHeight: '68px' }}>
         <div className="shrink-0 flex items-center justify-center" style={{ width: '56px' }}>
@@ -657,7 +680,32 @@ function Sidebar({ view, onChange, count }) {
           <div className="text-[10px] text-[#9A9A96]">篇文章 · 全資料庫</div>
         </div>
       </div>
-    </aside>
+      </aside>
+
+      {/* ── Mobile: fixed bottom tab bar ── */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-[700] bg-white/95 border-t border-[#E2E0DC] flex items-stretch pb-safe"
+        style={{ backdropFilter: 'blur(12px)' }}
+      >
+        {items.map(({ id, label, Icon }) => {
+          const active = view === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onChange(id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors ${
+                active ? 'text-[#C8621E]' : 'text-[#9A9A96]'
+              }`}
+            >
+              <Icon size={21} strokeWidth={active ? 2 : 1.5} />
+              <span className={`text-[9px] leading-none tracking-wide ${active ? 'font-semibold' : 'font-medium'}`}>
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 }
 
@@ -718,7 +766,7 @@ function StrategicManagement({ articles }) {
   const monthStats = useMemo(() => getMonthlyStatsFromArticles(articles, FIXED_YEAR), [articles]);
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full overflow-auto pb-16 md:pb-0">
       <div className="max-w-[1180px] mx-auto px-8 py-8">
         {/* Header */}
         <div className="mb-6 flex items-end justify-between flex-wrap gap-3">
@@ -1057,7 +1105,7 @@ function DataManagement({ articles, summary }) {
   const updated    = summary?.updated || '';
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full overflow-auto pb-16 md:pb-0">
       <div className="max-w-[1180px] mx-auto px-8 py-8">
         <div className="mb-6 flex items-end justify-between flex-wrap gap-3">
           <div>
@@ -1297,7 +1345,7 @@ function ArticleManagement({ articles }) {
   const clearAll = () => { setQ(''); setStatus(''); setRegion(''); setTheme(''); setSubdir(''); };
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full overflow-auto pb-16 md:pb-0">
       <div className="max-w-[1380px] mx-auto px-8 py-8">
 
         <div className="mb-6">
@@ -1473,14 +1521,14 @@ function ArticleDetailModal({ article, onClose }) {
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto p-8"
+      className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto p-3 md:p-8"
       style={{ background: 'rgba(0,0,0,0.5)' }}
     >
-      <div className="bg-white w-full max-w-[720px] shadow-2xl">
-        <div className="px-7 py-6 border-b border-[#F2F1EE] sticky top-0 bg-white z-10">
-          <div className="flex justify-between items-start gap-4 mb-3">
-            <h2 className="text-[19px] font-medium text-[#1C1C1C] leading-snug flex-1">{a.title}</h2>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center border border-[#E2E0DC] bg-[#F8F7F5] hover:bg-[#F2F1EE] text-[#6B6B6B]">
+      <div className="bg-white w-full max-w-[720px] shadow-2xl my-2 md:my-0">
+        <div className="px-4 md:px-7 py-4 md:py-6 border-b border-[#F2F1EE] sticky top-0 bg-white z-10">
+          <div className="flex justify-between items-start gap-3 mb-3">
+            <h2 className="text-[16px] md:text-[19px] font-medium text-[#1C1C1C] leading-snug flex-1">{a.title}</h2>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center border border-[#E2E0DC] bg-[#F8F7F5] hover:bg-[#F2F1EE] text-[#6B6B6B] shrink-0">
               <X size={16} strokeWidth={1.5} />
             </button>
           </div>
@@ -1507,7 +1555,7 @@ function ArticleDetailModal({ article, onClose }) {
             </div>
           )}
         </div>
-        <div className="px-7 py-6 max-h-[60vh] overflow-y-auto">
+        <div className="px-4 md:px-7 py-4 md:py-6 max-h-[65vh] overflow-y-auto">
           {a.image_url && (
             <img src={a.image_url} alt="" className="w-full max-h-[240px] object-cover mb-4"
               onError={(e) => { e.target.style.display = 'none'; }} />
@@ -2390,28 +2438,50 @@ function TravelPlanner({ articles }) {
   };
 
   const activeStop = resolvedStops.find((s) => s.key === active);
+  const isMobile   = useMobile();
+
+  /* ── 行動裝置：面板底部高度（含 56px 底部導覽列） ── */
+  const mobileBottom   = 56;   // bottom nav height
+  const mobilePanelMax = isMobile
+    ? (plan && inputCollapsed ? '56vh' : '68vh')
+    : undefined;
 
   return (
     <div className="relative h-full bg-[#F8F7F5] overflow-hidden">
-      {/* Map */}
+      {/* Map — full-screen background */}
       <div className="absolute inset-0">
         <PlannerMap geotagged={geotagged} stops={resolvedStops} activeKey={active} onMarkerClick={setActive} />
       </div>
 
-      {/* Floating reopen button — top-left of visible map area */}
+      {/* Floating reopen button */}
       {inputCollapsed && (
         <button
           onClick={reopenInput}
           title="重新輸入行程需求"
           className="absolute z-[600] w-10 h-10 rounded-full bg-white shadow-lg border border-[#E2E0DC] flex items-center justify-center text-[#C8621E] hover:bg-[#FBF0E8] transition-colors ist-fade-in"
-          style={{ top: '16px', left: '390px' }}
+          style={isMobile
+            ? { top: '14px', left: '50%', transform: 'translateX(-50%)' }
+            : { top: '16px', left: '390px' }
+          }
         >
           <MessageCircle size={16} strokeWidth={1.5} />
         </button>
       )}
 
-      {/* Left glass panel */}
-      <aside className="absolute top-0 left-0 bottom-0 w-[380px] z-[500] flex flex-col ist-glass">
+      {/* Glass panel — left rail on desktop / bottom sheet on mobile */}
+      <aside
+        className={`absolute z-[500] flex flex-col ist-glass ${
+          isMobile
+            ? 'left-0 right-0 rounded-t-2xl'
+            : 'top-0 left-0 bottom-0 w-[380px]'
+        }`}
+        style={isMobile
+          ? { bottom: mobileBottom, maxHeight: mobilePanelMax, overflowY: 'hidden' }
+          : {}
+        }
+      >
+        {/* Handle bar (mobile only) */}
+        {isMobile && <div className="ist-sheet-handle" />}
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/50 shrink-0">
@@ -2608,14 +2678,17 @@ function TravelPlanner({ articles }) {
         )}
       </aside>
 
-      {/* Active popover */}
+      {/* Active popover — top on mobile (above sheet), bottom-right on desktop */}
       {activeStop && (
-        <div className="absolute bottom-6 right-6 w-[340px] z-[500] ist-glass rounded-xl overflow-hidden ist-fade-in shadow-lg">
-          {/* 👇 補上 onOpenDetail 屬性 */}
-          <ActivePopover 
-            stop={activeStop} 
-            onClose={() => setActive(null)} 
-            onOpenDetail={() => setDetailArticle(activeStop.article)} 
+        <div className={`absolute z-[600] ist-glass rounded-xl overflow-hidden ist-fade-in shadow-lg ${
+          isMobile
+            ? 'top-3 left-3 right-3'
+            : 'bottom-6 right-6 w-[340px]'
+        }`}>
+          <ActivePopover
+            stop={activeStop}
+            onClose={() => setActive(null)}
+            onOpenDetail={() => setDetailArticle(activeStop.article)}
           />
         </div>
       )}
