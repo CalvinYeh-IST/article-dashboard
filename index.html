@@ -1555,6 +1555,35 @@ ABSOLUTE RULES:
 6. RECOMMENDED: For articles thematically relevant but cannot be a stop (座標:無 and off-route, or great supplementary reads), add to "recommended" array (max 5, no duplicates with stops).
 If physically impossible, set feasibility="impossible", explain, still provide best realistic alternative.`;
 
+/**
+ * 分析文章資料庫，計算各分類（小吃/店家/伴手禮/景點/活動）的數量分佈。
+ * 若使用者需求中提到具體城市，則只計算該城市的文章，讓提問更具針對性。
+ */
+function computeCategoryStats(articles, queryText = '') {
+  const allCities = [
+    '台北', '新北', '基隆', '桃園', '新竹', '苗栗', '台中',
+    '彰化', '南投', '雲林', '嘉義', '台南', '高雄', '屏東',
+    '宜蘭', '花蓮', '台東', '澎湖', '金門', '馬祖', '綠島', '小琉球',
+  ];
+  const mentionedCities = allCities.filter((c) => queryText.includes(c));
+
+  const pool = mentionedCities.length > 0
+    ? articles.filter((a) => mentionedCities.some((c) =>
+        (a.city || '').includes(c) || (a.area || '').includes(c)
+      ))
+    : articles;
+
+  return {
+    snack: pool.filter((a) => a.hasSnack).length,
+    store: pool.filter((a) => a.hasStore).length,
+    gift:  pool.filter((a) => a.hasGift).length,
+    sight: pool.filter((a) => a.hasSight).length,
+    event: pool.filter((a) => a.hasEvent).length,
+    total: pool.length,
+    location: mentionedCities.length > 0 ? mentionedCities.join('、') : '全台',
+  };
+}
+
 /** Build compact article context for Gemini — 假座標視同無座標 */
 function buildArticleContext(articles, maxContentChars = 600) {
   return articles.map((a) => {
@@ -1589,7 +1618,7 @@ function buildArticleContext(articles, maxContentChars = 600) {
   }).join('\n');
 }
 
-async function callGeminiPlanner({ userQuery, articles, apiKey, signal }) {
+async function callGeminiPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
   // Prioritise articles with coordinates for travel planning, but include some without
   // so the model can suggest them with "AI Estimated" flag if relevant
   const withCoords    = articles.filter(hasRealCoords);
@@ -1598,9 +1627,46 @@ async function callGeminiPlanner({ userQuery, articles, apiKey, signal }) {
 
   const context = buildArticleContext(poolArticles, 500);
 
-  const prompt = `${PLANNER_SYSTEM_PROMPT}
+  let prompt = '';
 
-【 使用者需求 】
+  if (isClarifyPhase) {
+    // ── 第一階段：資料庫感知提問 ──
+    // 根據資料庫中實際有的內容分布，產生一個有意義的針對性問題
+    const stats = categoryStats || computeCategoryStats(articles, userQuery);
+    const available = [
+      stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
+      stats.store > 0 && `特色店家（${stats.store} 篇）`,
+      stats.sight > 0 && `景點探索（${stats.sight} 篇）`,
+      stats.gift  > 0 && `伴手禮採買（${stats.gift} 篇）`,
+      stats.event > 0 && `活動體驗（${stats.event} 篇）`,
+    ].filter(Boolean);
+
+    prompt = `你是一位熟悉台灣在地旅遊的私人管家，正在為旅客規劃行程。
+
+【 旅客的初步需求 】
+${userQuery}
+
+【 我們資料庫在「${stats.location}」的現有內容分布 】
+共 ${stats.total} 篇文章，包含：${available.join('、') || '各類主題'}
+
+【 你的任務 】
+根據旅客的需求與上方資料庫實際有的內容分布，提出「一個」最能幫助你精準規劃行程的問題。
+問題要基於資料庫實際有的內容來問（例如：若小吃篇數最多，就問他想不想多安排美食行程）。
+不要問資料庫沒有對應內容的問題。
+語氣請像在地熱情的旅遊顧問。
+
+【 輸出格式 】
+只能回傳 JSON，不得包含任何其他文字或 markdown：
+{
+  "action": "clarify",
+  "message": "用親切在地口吻問一個問題，可以提到我們資料庫裡有什麼（繁體中文，2-3句話）",
+  "options": ["選項A", "選項B", "選項C", "讓我來幫你搭配就好！"]
+}`;
+  } else {
+    // ── 第二階段：依確認偏好輸出行程 ──
+    prompt = `${PLANNER_SYSTEM_PROMPT}
+
+【 使用者需求與已確認偏好 】
 ${userQuery}
 
 【 可用文章資料庫 (${poolArticles.length} 篇) 】
@@ -1638,7 +1704,9 @@ ${context}
 4. 如果使用者的需求（例如「一天玩遍全台」）不可行，設定 feasibility="impossible"，在 message 解釋，但仍在 days 提供最接近的可行替代方案。
 5. 如果需要調整（例如需要更多天數），設定 feasibility="adjusted"，在 message 解釋調整原因。
 6. 只使用資料庫中提供的資料；不要引入資料庫以外的景點。
-7. recommended 放座標:無但主題高度相符的文章，或行程縣市的深度延伸閱讀，最多 5 篇，不得與 stops 重複。`;
+7. recommended 放座標:無但主題高度相符的文章，或行程縣市的深度延伸閱讀，最多 5 篇，不得與 stops 重複。
+8. 務必優先符合使用者已確認的偏好（例如：若使用者選擇「主攻小吃」，stops 應以有 hasSnack 標記的地點為主）。`;
+  }
 
   let lastErr = null;
   for (const model of GEMINI_MODELS) {
@@ -1879,6 +1947,9 @@ function TravelPlanner({ articles }) {
   const [inputCollapsed, setInputCollapsed] = useState(false);
   const [isDemo, setIsDemo]         = useState(false);
   const [detailArticle, setDetailArticle] = useState(null);
+  // ── 對話式提問狀態 ──
+  const [clarification, setClarification] = useState(null);  // { message, options }
+  const [initialQuery, setInitialQuery]   = useState('');     // 使用者一開始打的需求
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -1915,17 +1986,38 @@ function TravelPlanner({ articles }) {
   const geotagged = useMemo(() => articles.filter(hasRealCoords), [articles]);
 
   /* ── submit via API ── */
-  const runApi = useCallback(async (q, key) => {
-    setBusy(true); setApiErr(''); setPlan(null); setActive(null); setIsDemo(false);
+  const runApi = useCallback(async (q, key, isClarifyPhase = true) => {
+    setBusy(true); setApiErr('');
+
+    // 只有在「給行程階段」才清掉舊結果
+    if (!isClarifyPhase) {
+      setPlan(null); setActive(null); setIsDemo(false);
+    }
+
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+
     try {
+      // 在送給 Gemini 之前，先在前端算出資料庫分布，讓提問更有針對性
+      const categoryStats = isClarifyPhase ? computeCategoryStats(articles, q) : null;
+
       const { result } = await callGeminiPlanner({
-        userQuery: q, articles, apiKey: key, signal: abortRef.current.signal,
+        userQuery: q, articles, apiKey: key,
+        signal: abortRef.current.signal,
+        isClarifyPhase, categoryStats,
       });
-      setPlan(result);
-      setInputCollapsed(true);
-      if (result?.days?.[0]?.stops?.[0]) setActive(`${result.days[0].day}-0`);
+
+      if (result.action === 'clarify') {
+        // 第一階段：顯示提問氣泡
+        setClarification(result);
+        setInitialQuery(q);
+      } else {
+        // 第二階段：顯示行程
+        setPlan(result);
+        setClarification(null);
+        setInputCollapsed(true);
+        if (result?.days?.[0]?.stops?.[0]) setActive(`${result.days[0].day}-0`);
+      }
     } catch (e) {
       if (e.name !== 'AbortError') setApiErr(`API 錯誤：${e.message}`);
     } finally { setBusy(false); }
@@ -1935,16 +2027,30 @@ function TravelPlanner({ articles }) {
     const q = draft.trim(); if (!q) return;
     const key = localStorage.getItem('gemini_key');
     if (!key) { setApiErr('尚未設定 Gemini API Key，請點右上角齒輪圖示設定'); return; }
-    setQuery(q); runApi(q, key);
+    setQuery(q);
+    setClarification(null);  // 清掉前一輪的提問
+    runApi(q, key, true);    // 強制進入「提問階段」
   };
+
+  /* ── 使用者點選選項按鈕 → 合併需求 → 直接要行程 ── */
+  const handleOptionSelect = useCallback((opt) => {
+    const key = localStorage.getItem('gemini_key');
+    if (!key) return;
+    const combined = `${initialQuery}。補充偏好：${opt}`;
+    setDraft(combined);
+    setQuery(combined);
+    setClarification(null);
+    runApi(combined, key, false);  // 已取得偏好，直接要行程
+  }, [initialQuery, runApi]);
 
   /* ── preset card click ── */
   const handlePresetClick = useCallback((preset) => {
     const key = localStorage.getItem('gemini_key');
     setQuery(preset.title);
+    setClarification(null);  // 清掉提問氣泡
     if (key) {
       setDraft(preset.query);
-      runApi(preset.query, key);
+      runApi(preset.query, key, true);  // 預設卡片也走提問流程
     } else {
       const demo = DEMO_PLANS[preset.key];
       if (!demo) return;
@@ -1958,6 +2064,7 @@ function TravelPlanner({ articles }) {
   const reopenInput = () => {
     setInputCollapsed(false); setPlan(null); setActive(null);
     setIsDemo(false); setApiErr('');
+    setClarification(null); setInitialQuery('');  // 清掉對話狀態
   };
 
   const activeStop = resolvedStops.find((s) => s.key === active);
@@ -2035,17 +2142,42 @@ function TravelPlanner({ articles }) {
                   {apiErr}
                 </div>
               )}
+
+              {/* ── 對話式提問氣泡 ── */}
+              {clarification && !busy && (
+                <div className="mt-3 px-4 py-3 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg ist-fade-in shadow-sm">
+                  <div className="flex items-start gap-2 mb-2.5 text-[#A35200]">
+                    <Sparkles size={13} strokeWidth={2} className="mt-0.5 shrink-0" />
+                    <span className="text-[12px] font-medium leading-relaxed">{clarification.message}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(clarification.options || []).map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => handleOptionSelect(opt)}
+                        disabled={busy}
+                        className="text-[11px] px-3 py-1.5 rounded-full bg-white border border-[#FDE68A] text-[#854F0B] hover:bg-[#FDE68A] hover:text-[#A35200] transition-colors disabled:opacity-50 shadow-sm"
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-[10px] text-[#C8A24A]">或直接在上方輸入框補充說明後送出</div>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
               {busy ? (
                 <div className="py-8 text-center">
                   <Loader2 size={28} className="text-[#C8621E] mx-auto animate-spin" />
-                  <div className="text-[12px] text-[#888780] mt-3">AI 正在規劃行程，約需 10–30 秒…</div>
+                  <div className="text-[12px] text-[#888780] mt-3">
+                    {clarification ? 'AI 正在依你的偏好規劃行程…' : 'AI 正在分析你的需求…'}
+                  </div>
                   <div className="text-[10px] text-[#9A9A96] mt-1">已載入 {articles.length} 篇文章供 AI 匹配</div>
                 </div>
               ) : (
-                <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
+                !clarification && <PresetsGrid onSelect={handlePresetClick} disabled={busy} />
               )}
             </div>
           </>
