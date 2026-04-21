@@ -95,6 +95,94 @@
   /* Lock screen */
   .lock-input { letter-spacing: 0.14em; text-align: center; }
 
+  /* ─── Immersive article pin (background dots) ─────────── */
+  .ist-article-pin { cursor: pointer; }
+
+  /* Dot state (default / low zoom) */
+  .ist-pin-dot {
+    width: 10px; height: 10px;
+    background: rgba(154,154,150,0.6);
+    border: 1.5px solid rgba(255,255,255,0.85);
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: width 0.35s ease, height 0.35s ease,
+                background 0.35s ease, border-color 0.35s ease;
+  }
+  /* Pulsing state (zoom >= 11) */
+  .ist-article-pin.pulsing .ist-pin-dot {
+    background: rgba(200,98,30,0.22);
+    border-color: rgba(200,98,30,0.55);
+    animation: ist-pulse 1.9s ease-in-out infinite;
+  }
+
+  /* Card state (zoom >= 13) */
+  .ist-pin-card {
+    display: none;
+    width: 88px;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.22), 0 1px 6px rgba(0,0,0,0.1);
+    transform-origin: bottom center;
+    animation: ist-pin-pop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes ist-pin-pop {
+    from { opacity: 0; transform: scale(0.7); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Needle below card */
+  .ist-pin-needle {
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #fff;
+    margin: 0 auto;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12));
+  }
+
+  /* Thumb area – 1:1 */
+  .ist-pin-thumb-wrap {
+    position: relative;
+    width: 88px; height: 88px;
+    overflow: hidden;
+    background: #FBF0E8;
+  }
+  .ist-pin-thumb-fallback {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; color: #C8621E;
+  }
+  .ist-pin-thumb {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    transition: opacity 0.2s;
+  }
+  .ist-pin-name {
+    padding: 5px 7px 7px;
+    font-size: 10.5px; font-weight: 500; color: #1C1C1C;
+    line-height: 1.35; font-family: -apple-system,'PingFang TC',sans-serif;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* Toggle: high-zoom shows card, hides dot */
+  .ist-article-pin.high-zoom .ist-pin-dot { display: none; }
+  .ist-article-pin.high-zoom .ist-pin-card { display: block; }
+
+  /* ─── Dot popup (floating card on click) ─────────────── */
+  .ist-dot-popup .mapboxgl-popup-content {
+    padding: 0 !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08) !important;
+    width: 160px;
+    border: none !important;
+  }
+  .ist-dot-popup .mapboxgl-popup-tip      { display: none !important; }
+  .ist-dot-popup .mapboxgl-popup-close-button { display: none !important; }
+
 </style>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
@@ -2918,6 +3006,92 @@ function ActivePopover({ stop, onClose, onOpenDetail }) {
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiY2FsdmlueWVoIiwiYSI6ImNtbzZyaGFhdjI1MTMyd285dTZ4eTZoeXIifQ.XHK2QtNiIPnvo5M1p7ldKA';
 const MAPBOX_STYLE = 'mapbox://styles/calvinyeh/cmo6y6xmy00co01rg2qagejhq';
 
+/**
+ * 建立背景點位的 DOM 元素。
+ * 包含「點狀」與「卡片」兩層，由 CSS class 切換顯示。
+ */
+function buildDotElement(a) {
+  const pin = document.createElement('div');
+  pin.className = 'ist-article-pin';
+
+  // ── Dot layer ──
+  const dot = document.createElement('div');
+  dot.className = 'ist-pin-dot';
+  pin.appendChild(dot);
+
+  // ── Card layer (shown at high zoom) ──
+  const card = document.createElement('div');
+  card.className = 'ist-pin-card';
+
+  const thumbWrap = document.createElement('div');
+  thumbWrap.className = 'ist-pin-thumb-wrap';
+
+  // Fallback (always rendered behind image)
+  const fallback = document.createElement('div');
+  fallback.className = 'ist-pin-thumb-fallback';
+  fallback.textContent = '🗺️';
+  thumbWrap.appendChild(fallback);
+
+  // Image (overlays fallback; onerror hides it)
+  if (a.image_url) {
+    const img = document.createElement('img');
+    img.className = 'ist-pin-thumb';
+    img.src = a.image_url;
+    img.alt = '';
+    img.onerror = () => { img.style.opacity = '0'; };
+    thumbWrap.appendChild(img);
+  }
+  card.appendChild(thumbWrap);
+
+  // Title
+  const name = document.createElement('div');
+  name.className = 'ist-pin-name';
+  name.textContent = a.title || '';
+  card.appendChild(name);
+
+  // Needle
+  const needle = document.createElement('div');
+  needle.className = 'ist-pin-needle';
+  card.appendChild(needle);
+
+  pin.appendChild(card);
+  return pin;
+}
+
+/**
+ * 建立點位 popup 的 HTML — 160px 寬，1:1 縮圖 + 標題 + 地點。
+ */
+function buildDotPopupHtml(a) {
+  const title = escapeHtml(a.title || '');
+  const loc   = escapeHtml([a.city, a.area].filter(Boolean).join(' · '));
+  const imgBlock = a.image_url
+    ? `<div style="position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;background:#FBF0E8">
+         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:32px;color:#C8621E">🗺️</div>
+         <img src="${escapeHtml(a.image_url)}" alt=""
+              style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"
+              onerror="this.style.opacity=0">
+       </div>`
+    : `<div style="width:100%;aspect-ratio:1/1;background:#FBF0E8;display:flex;align-items:center;justify-content:center;font-size:36px;color:#C8621E">🗺️</div>`;
+
+  return `<div>
+    ${imgBlock}
+    <div style="padding:8px 10px 10px">
+      <div style="font-size:11.5px;font-weight:500;color:#1C1C1C;line-height:1.45;
+                  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+                  overflow:hidden;font-family:-apple-system,'PingFang TC',sans-serif">
+        ${title}
+      </div>
+      ${loc
+        ? `<div style="font-size:10px;color:#9A9A96;margin-top:3px;
+                       font-family:-apple-system,'PingFang TC',sans-serif">
+             ${loc}
+           </div>`
+        : ''
+      }
+    </div>
+  </div>`;
+}
+
 /* ============================================================
    【K】Mapbox GL Map component
    ============================================================ */
@@ -2940,26 +3114,52 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
     });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     mapRef.current = map;
+
+    // ── Zoom-aware dot state ──
+    // zoom >= 11 → pulse animation；zoom >= 13 → 展開為縮圖卡片
+    map.on('zoom', () => {
+      const z = map.getZoom();
+      dotsRef.current.forEach((m) => {
+        const el = m.getElement();
+        el.classList.toggle('pulsing',   z >= 11);
+        el.classList.toggle('high-zoom', z >= 13);
+      });
+    });
+
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
-  // Faded background dots
+  // Faded background dots — zoom-aware, with 1:1 thumbnail popup
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const addDots = () => {
       dotsRef.current.forEach((m) => m.remove());
       dotsRef.current = [];
-      const stopIds = new Set(stops.map((s) => s.article.id));
+      const stopIds    = new Set(stops.map((s) => s.article.id));
+      const currentZ   = map.getZoom();
+
       geotagged.forEach((a) => {
         if (stopIds.has(a.id)) return;
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
         if (lat === null || lng === null) return;
-        const el = document.createElement('div');
-        el.className = 'ist-marker-dot';
-        const marker = new mapboxgl.Marker({ element: el })
+
+        // 用 buildDotElement 建立雙層 DOM（dot + card）
+        const el = buildDotElement(a);
+        if (currentZ >= 11) el.classList.add('pulsing');
+        if (currentZ >= 13) el.classList.add('high-zoom');
+
+        // 精緻 popup — 1:1 縮圖卡片
+        const popup = new mapboxgl.Popup({
+          offset:      [0, -4],
+          closeButton: false,
+          className:   'ist-dot-popup',
+          maxWidth:    '160px',
+        }).setHTML(buildDotPopupHtml(a));
+
+        // anchor:'bottom' → 卡片在高縮放時自然向上展開，針尖對準座標
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([lng, lat])
-          .setPopup(new mapboxgl.Popup({ offset: 6, closeButton: false })
-            .setHTML(`<div style="font-size:11px;color:#1C1C1C">${escapeHtml(a.title)}</div>`))
+          .setPopup(popup)
           .addTo(map);
         dotsRef.current.push(marker);
       });
