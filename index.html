@@ -185,6 +185,16 @@ function parseCoord(v) {
 }
 const hasCoords = (a) => parseCoord(a.lat) !== null && parseCoord(a.lng) !== null;
 
+/** 排除系統預設中心點假座標（南投 120.962, 23.448），只有真實標註才算有座標 */
+const DUMMY_LAT = 23.448446802266;
+const DUMMY_LNG = 120.96249165306;
+const DUMMY_THRESHOLD = 0.05; // 約 5km 容錯半徑
+const hasRealCoords = (a) => {
+  if (!hasCoords(a)) return false;
+  const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+  return !(Math.abs(lat - DUMMY_LAT) < DUMMY_THRESHOLD && Math.abs(lng - DUMMY_LNG) < DUMMY_THRESHOLD);
+};
+
 /** 百分比對應顏色與文字，直接從 main.js 移植 */
 function pctColor(p) { return p >= 100 ? '#1A6B45' : p >= 80 ? '#A35200' : '#B91C1C'; }
 function pctBg(p)    { return p >= 100 ? '#D1FAE5' : p >= 80 ? '#FEF3C7' : '#FEE2E2'; }
@@ -1509,14 +1519,25 @@ function Chip({ children, color = '#F2F1EE', text = '#6B6B6B' }) {
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash-lite'];
 
-const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner. Your itinerary MUST be physically realistic. Do NOT pack locations that are too close or too far without logic. You MUST account for at least 40 minutes of travel/buffer time between locations. Consider real-world geographic distances in Taiwan. If a user's request is physically impossible within the timeframe, politely explain why and offer a realistic alternative based ONLY on the provided database.`;
+const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner.
 
-/** Build compact article context for Gemini — includes truncated content for semantic matching */
+ABSOLUTE RULES — follow these before anything else:
+1. LOCATION SOURCE OF TRUTH: The "地點(city/area)" field in each article is the ONLY authoritative location. Any city or county name appearing in article content/description is background context — NEVER use it to determine where the article's location is.
+2. NO-COORD ARTICLES: Articles marked "座標:無" have no GPS data. Treat them as located in their stated city/area. Do NOT move them elsewhere. Group them with same-city stops.
+3. GEOGRAPHIC CLUSTERING: Each day's stops must be within the same county or adjacent townships. Never schedule Taipei and Kaohsiung on the same day.
+4. TRAVEL BUFFER: Minimum 40 minutes between stops. 4 stops per day maximum.
+5. DATABASE ONLY: Only use article IDs from the provided database. Never invent locations.
+If a request is physically impossible, set feasibility="impossible", explain in message, and still provide the best realistic alternative.`;
+
+/** Build compact article context for Gemini
+ *  假座標（南投中心點）視同無座標，不傳給 AI，避免誤導動線 */
 function buildArticleContext(articles, maxContentChars = 600) {
   return articles.map((a) => {
     const parts = [];
     parts.push(`#${a.id} 《${a.title}》`);
-    if (a.city || a.area) parts.push(`地點:${[a.city, a.area].filter(Boolean).join('/')}`);
+    // 地點永遠放第一，且加上 [地點錨點] 標記強調權威性
+    const locationStr = [a.city, a.area].filter(Boolean).join('/');
+    if (locationStr) parts.push(`地點[錨點]:${locationStr}`);
     const region = asArr(a.region).join('+');
     if (region) parts.push(`區域:${region}`);
     const theme = asArr(a.theme).join('+');
@@ -1530,7 +1551,12 @@ function buildArticleContext(articles, maxContentChars = 600) {
     if (a.hasSight && a.sightKw) haves.push(`景點(${a.sightKw})`);
     if (a.hasEvent && a.eventKw) haves.push(`活動(${a.eventKw})`);
     if (haves.length) parts.push(haves.join(' '));
-    if (hasCoords(a)) parts.push(`座標:(${parseCoord(a.lat).toFixed(3)},${parseCoord(a.lng).toFixed(3)})`);
+    // 只傳真實座標；假座標（南投中心點）標記為無，避免 AI 誤判距離
+    if (hasRealCoords(a)) {
+      parts.push(`座標:(${parseCoord(a.lat).toFixed(3)},${parseCoord(a.lng).toFixed(3)})`);
+    } else {
+      parts.push('座標:無');
+    }
     if (a.description) parts.push(`描述:${String(a.description).slice(0, 160)}`);
     if (a.content) {
       const content = String(a.content).replace(/\s+/g, ' ').trim().slice(0, maxContentChars);
@@ -1543,8 +1569,8 @@ function buildArticleContext(articles, maxContentChars = 600) {
 async function callGeminiPlanner({ userQuery, articles, apiKey, signal }) {
   // Prioritise articles with coordinates for travel planning, but include some without
   // so the model can suggest them with "AI Estimated" flag if relevant
-  const withCoords    = articles.filter(hasCoords);
-  const withoutCoords = articles.filter((a) => !hasCoords(a)).slice(0, 80);
+  const withCoords    = articles.filter(hasRealCoords);
+  const withoutCoords = articles.filter((a) => !hasRealCoords(a)).slice(0, 80);
   const poolArticles  = [...withCoords, ...withoutCoords];
 
   const context = buildArticleContext(poolArticles, 500);
@@ -1666,7 +1692,7 @@ function TravelPlanner({ articles }) {
           order: j + 1,
           stop: s,
           article: a,
-          estimated: !hasCoords(a),
+          estimated: !hasRealCoords(a),  // 假座標也視為 estimated
           key: `${d.day}-${j}`,
         });
       });
@@ -1676,7 +1702,7 @@ function TravelPlanner({ articles }) {
     return list;
   }, [plan, articleById]);
 
-  const geotagged = useMemo(() => articles.filter(hasCoords), [articles]);
+  const geotagged = useMemo(() => articles.filter(hasRealCoords), [articles]);
 
   const submit = async () => {
     const q = draft.trim();
@@ -2051,8 +2077,8 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
 
       stops.forEach((s) => {
         const a = s.article;
+        if (!hasRealCoords(a)) return;   // 跳過假座標，不在地圖上顯示
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-        if (lat === null || lng === null) return;
         const activeCls = activeKey === s.key ? ' active' : '';
         const estCls    = s.estimated ? ' estimated' : '';
         const el = document.createElement('div');
@@ -2074,10 +2100,10 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
         markersRef.current.set(s.key, marker);
       });
 
-      // Fit bounds
+      // Fit bounds — 只用真實座標
       const coords = stops
-        .map((s) => [parseCoord(s.article.lng), parseCoord(s.article.lat)])
-        .filter(([ln, la]) => ln !== null && la !== null);
+        .filter((s) => hasRealCoords(s.article))
+        .map((s) => [parseCoord(s.article.lng), parseCoord(s.article.lat)]);
       if (coords.length > 1) {
         const bounds = coords.reduce(
           (b, c) => b.extend(c),
@@ -2115,8 +2141,8 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
     const map = mapRef.current; if (!map || !activeKey) return;
     const s = stops.find((x) => x.key === activeKey);
     if (!s) return;
+    if (!hasRealCoords(s.article)) return;  // 假座標不飛
     const lat = parseCoord(s.article.lat), lng = parseCoord(s.article.lng);
-    if (lat === null || lng === null) return;
     map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 12), duration: 900 });
     const marker = markersRef.current.get(activeKey);
     if (marker) marker.togglePopup();
