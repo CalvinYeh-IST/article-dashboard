@@ -1916,8 +1916,9 @@ function buildSmartPool(articles, intent) {
   const withCoords    = sorted.filter(hasRealCoords);
   const withoutCoords = sorted.filter((a) => !hasRealCoords(a));
 
-  // 有座標全拿（行程骨架），無座標最多 60 篇（推薦用）
-  return [...withCoords, ...withoutCoords.slice(0, 60)];
+  // 無座標：隨機取 5 篇當 recommended 備用（固定不隨天數膨脹）
+  const shuffled = [...withoutCoords].sort(() => Math.random() - 0.5);
+  return [...withCoords, ...shuffled.slice(0, 5)];
 }
 
 /**
@@ -1940,51 +1941,42 @@ function computeCategoryStats(articles, queryText = '') {
 }
 
 
-/** Build compact article context for Gemini — 假座標視同無座標 */
-function buildArticleContext(articles, maxContentChars = 400) {
+/** Build compact article context for Gemini — 極簡格式，省 token
+ *  格式：id|標題|城市/區|區域縮寫|主題縮寫|標籤|座標或-
+ *  範例：42|台南安平豆花|台南/安平|南|美食|s:豆花古早味|22.994,120.161
+ */
+function buildArticleContext(articles) {
+  const REGION_SHORT = { '北部':'北','中部':'中','南部':'南','東部':'東','離島':'島' };
+  const THEME_SHORT  = { '文化美食':'美食','自然生態':'生態','常民生活':'常民','藝術文化':'藝文','綜覽台灣':'綜覽' };
+
   return articles.map((a) => {
-    const parts = [];
-    parts.push(`#${a.id} 《${a.title}》`);
-    const loc = [a.city, a.area].filter(Boolean).join('/');
-    if (loc) parts.push(`地點[錨點]:${loc}`);
-    const region = asArr(a.region).join('+');
-    if (region) parts.push(`區域:${region}`);  // ← 讓 Gemini 看到區域標籤
-    const theme = asArr(a.theme).join('+');
-    if (theme) parts.push(`主題:${theme}`);
-    const subDir = asArr(a.subDir).join('+');
-    if (subDir) parts.push(`子目錄:${subDir}`);  // ← 新增：提供內容類型信號
-    const season = asArr(a.season).join('+');
-    if (season && season !== '其他') parts.push(`時令:${season}`);
-    const haves = [];
-    if (a.hasStore && a.storeKw) haves.push(`店家(${a.storeKw})`);
-    if (a.hasSnack && a.snackKw) haves.push(`小吃(${a.snackKw})`);
-    if (a.hasGift  && a.giftKw ) haves.push(`伴手禮(${a.giftKw})`);
-    if (a.hasSight && a.sightKw) haves.push(`景點(${a.sightKw})`);
-    if (a.hasEvent && a.eventKw) haves.push(`活動(${a.eventKw})`);
-    if (haves.length) parts.push(haves.join(' '));
+    const loc    = [a.city, a.area].filter(Boolean).join('/') || '';
+    const region = asArr(a.region).map((r) => REGION_SHORT[r] || r).join('');
+    const theme  = asArr(a.theme).map((t) => THEME_SHORT[t] || t).join('+');
+
+    const tags = [];
+    if (a.hasSnack && a.snackKw) tags.push(`s:${String(a.snackKw).slice(0,10)}`);
+    if (a.hasStore && a.storeKw) tags.push(`sh:${String(a.storeKw).slice(0,10)}`);
+    if (a.hasGift  && a.giftKw ) tags.push(`g:${String(a.giftKw).slice(0,10)}`);
+    if (a.hasSight && a.sightKw) tags.push(`v:${String(a.sightKw).slice(0,10)}`);
+    if (a.hasEvent && a.eventKw) tags.push(`e:${String(a.eventKw).slice(0,10)}`);
+    if (!tags.length) { const sd = asArr(a.subDir)[0]; if (sd) tags.push(sd.slice(0,4)); }
+
     const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-    const coordsValid = lat !== null && lng !== null
-      && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-    if (coordsValid && hasRealCoords(a)) {
-      parts.push(`座標:(${lat.toFixed(3)},${lng.toFixed(3)})`);
-    } else {
-      parts.push('座標:無');
-    }
-    if (a.description) parts.push(`描述:${String(a.description).slice(0, 120)}`);
-    return parts.join('｜');
+    const coordsValid = lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    const coord = (coordsValid && hasRealCoords(a)) ? `${lat.toFixed(3)},${lng.toFixed(3)}` : '-';
+
+    return `${a.id}|${a.title}|${loc}|${region}|${theme}|${tags.join(' ')}|${coord}`;
   }).join('\n');
 }
 
 async function callGeminiPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
-  // ── 核心修復：用 buildSmartPool 代替直接切分，確保地理與內容已預先篩選 ──
-  const intent      = detectQueryIntent(userQuery);
-  const poolArticles = buildSmartPool(articles, intent);
-  const context     = buildArticleContext(poolArticles);
+  const intent = detectQueryIntent(userQuery);
 
   let prompt = '';
 
   if (isClarifyPhase) {
-    // ── 第一階段：資料庫感知提問 ──
+    // ── 第一階段：只送統計數字，不帶 context，省 token ──
     const stats = categoryStats || computeCategoryStats(articles, userQuery);
     const available = [
       stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
@@ -2016,7 +2008,9 @@ ${userQuery}
   "options": ["選項A", "選項B", "選項C", "讓我來幫你搭配就好！"]
 }`;
   } else {
-    // ── 第二階段：依確認偏好輸出行程 ──
+    // ── 第二階段：依確認偏好輸出行程（此時才建 context，clarify 不需要）──
+    const poolArticles = buildSmartPool(articles, intent);
+    const context      = buildArticleContext(poolArticles);
     // 生成意圖摘要，明確告訴 Gemini 這個池子是怎麼來的
     const intentSummary = [
       intent.regions.length > 0 && `目標地區：${intent.regions.join('、')}`,
