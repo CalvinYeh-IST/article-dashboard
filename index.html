@@ -836,11 +836,11 @@ function StrategicManagement({ articles }) {
   const unpub  = total - cnPub;
   const statusCounts = useMemo(() => ({
     '待上架': articles.filter((a) => !hasDate(a.dateZh) && a.status === '待上架').length,
-    '待改稿': articles.filter((a) => !hasDate(a.dateZh) && a.status === '待改稿').length,
     '待初審': articles.filter((a) => !hasDate(a.dateZh) && a.status === '待初審').length,
+    '待複審': articles.filter((a) => !hasDate(a.dateZh) && a.status === '待複審').length,
   }), [articles]);
 
-  const otherUnpub = unpub - statusCounts['待上架'] - statusCounts['待改稿'] - statusCounts['待初審'];
+  const otherUnpub = unpub - statusCounts['待上架'] - statusCounts['待初審'] - statusCounts['待複審'];
 
   // Manager metrics — all computed from articles, matching main.js renderMgr exactly
   const { lzQ, leQ } = useMemo(() => getKpiStats(articles, FIXED_YEAR), [articles]);
@@ -936,7 +936,7 @@ function StrategicManagement({ articles }) {
               <div className="text-[40px] font-light leading-none tracking-tight mt-1 mb-2 text-[#A35200]">{unpub}</div>
               <div className="text-[10px] text-[#A35200] mb-2.5">= 總數 {total} − 中文稿上架 {cnPub}</div>
               <div className="flex flex-col gap-1.5">
-                {[['待上架', '長官尚未簽核'], ['待初審', '長官尚未審閱'], ['待改稿', '編輯尚未潤稿']].map(([s, hint]) => (
+                {[['待上架', '長官尚未簽核'], ['待複審', '長官尚未審閱'], ['待初審', '編輯尚未潤稿']].map(([s, hint]) => (
                   <div key={s} className="flex justify-between items-center bg-white/70 px-2.5 py-1.5">
                     <span className="text-[11px] text-[#A35200]">
                       {s}<span className="text-[9px] text-[#C8782A] ml-1">({hint})</span>
@@ -1487,7 +1487,7 @@ function ArticleManagement({ articles }) {
           </div>
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
             <FilterInput placeholder="關鍵字搜尋…" value={q} onChange={setQ} />
-            <FilterSelect value={status} onChange={setStatus} options={['', '已上架', '待上架', '待改稿', '待初審', '翻譯中', '審稿/校稿']} placeholder="全部狀態" />
+            <FilterSelect value={status} onChange={setStatus} options={['', '已上架', '待上架', '待初審', '待複審', '翻譯中', '審稿/校稿']} placeholder="全部狀態" />
             <FilterSelect value={region} onChange={setRegion} options={['', ...REGIONS]} placeholder="全部區域" />
             <FilterSelect value={theme}  onChange={setTheme}  options={['', ...THEMES]}  placeholder="全部主題" />
             <FilterSelect value={subdir} onChange={setSubdir} options={['', ...allSubdirs]} placeholder="全部子目錄" />
@@ -1583,8 +1583,8 @@ function StatusBadge({ status }) {
   const map = {
     '已上架':    { bg: '#D1FAE5', fg: '#1A6B45' },
     '待上架':    { bg: '#FEF3C7', fg: '#A35200' },
-    '待改稿':    { bg: '#EEEDFE', fg: '#3C3489' },
-    '待初審':    { bg: '#E6F1FB', fg: '#185FA5' },
+    '待初審':    { bg: '#EEEDFE', fg: '#3C3489' },
+    '待複審':    { bg: '#E6F1FB', fg: '#185FA5' },
     '翻譯中':    { bg: '#FBF0E8', fg: '#C8621E' },
     '審稿/校稿': { bg: '#F2F1EE', fg: '#6B6B6B' },
   };

@@ -265,8 +265,8 @@ function renderExec(){
   const unpub=total-cnPub;
   const statusCounts={
     '待上架':arts.filter(a=>!hasDate(a.dateZh)&&a.status==='待上架').length,
-    '待改稿':arts.filter(a=>!hasDate(a.dateZh)&&a.status==='待改稿').length,
     '待初審':arts.filter(a=>!hasDate(a.dateZh)&&a.status==='待初審').length,
+    '待複審':arts.filter(a=>!hasDate(a.dateZh)&&a.status==='待複審').length,
   };
 
   document.getElementById('view-exec').innerHTML=`
@@ -316,17 +316,17 @@ function renderExec(){
         <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#A35200;margin-bottom:8px">未上架文章</div>
         <div style="font-size:40px;font-weight:300;color:#A35200;line-height:1;margin-bottom:8px;letter-spacing:-.02em">${unpub}</div>
         <div style="font-size:10px;color:#A35200;margin-bottom:10px">= 總數 ${total} − 中文稿上架 ${cnPub}</div>
-        <!-- ★ 固定順序：待上架→待初審→待改稿，含括號說明 -->
+        <!-- ★ 固定順序：待上架→待複審→待初審，含括號說明 -->
         <div style="display:flex;flex-direction:column;gap:5px">
-          ${[['待上架','長官尚未簽核'],['待初審','長官尚未審閱'],['待改稿','編輯尚未潤稿']].map(([s,hint])=>`
+          ${[['待上架','長官尚未簽核'],['待複審','長官尚未審閱'],['待初審','編輯尚未潤稿']].map(([s,hint])=>`
             <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.7);padding:6px 10px">
               <span style="font-size:11px;color:#A35200">${s}<span style="font-size:9px;color:#C8782A;margin-left:3px">(${hint})</span></span>
               <span style="font-size:13px;font-weight:500;color:#A35200">${statusCounts[s]||0} 篇</span>
             </div>`).join('')}
-          ${statusCounts['待上架']+statusCounts['待改稿']+statusCounts['待初審']<unpub?`
+          ${statusCounts['待上架']+statusCounts['待初審']+statusCounts['待複審']<unpub?`
             <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.5);padding:6px 10px">
               <span style="font-size:11px;color:#6B6B6B">其他</span>
-              <span style="font-size:13px;font-weight:500;color:#6B6B6B">${unpub-statusCounts['待上架']-statusCounts['待改稿']-statusCounts['待初審']} 篇</span>
+              <span style="font-size:13px;font-weight:500;color:#6B6B6B">${unpub-statusCounts['待上架']-statusCounts['待初審']-statusCounts['待複審']} 篇</span>
             </div>`:''}
         </div>
       </div>
@@ -843,7 +843,7 @@ function renderOps(){
       <div class="filter-bar">
         <input type="text" id="ops-search" placeholder="搜尋標題…" style="width:140px" oninput="renderOps()">
         <select id="ops-status" onchange="renderOps()"><option value="">全部狀態</option>
-          <option>已上架</option><option>待上架</option><option>待改稿</option><option>待初審</option>
+          <option>已上架</option><option>待上架</option><option>待初審</option><option>待複審</option>
         </select>
         <button class="btn-sm" onclick="exportCSV()">匯出 CSV</button>
         <button class="btn-sm btn-blue" onclick="openModal(null)">+ 新增文章</button>
@@ -863,7 +863,7 @@ function renderOps(){
   }
   const q=(document.getElementById('ops-search')||{}).value||'';
   const st=(document.getElementById('ops-status')||{}).value||'';
-  const smap={'已上架':'s3','待上架':'s2','待改稿':'s1','待初審':'s0'};
+  const smap={'已上架':'s3','待上架':'s2','待初審':'s1','待複審':'s0'};
   const f=articles.filter(a=>{
     if(opsYear!=='all'&&a.year!==opsYear) return false;
     if(q&&!a.title.toLowerCase().includes(q.toLowerCase())) return false;
@@ -1531,7 +1531,7 @@ function openModal(id){
   const mY=document.getElementById('m-year');
   if(mY) mY.innerHTML=(config.years||[]).map(y=>`<option${(m?m.year:FIXED_YEAR)===y?' selected':''}>${y}</option>`).join('');
   document.getElementById('m-title').value=m?m.title:'';
-  document.getElementById('m-status').value=m?m.status:'待初審';
+  document.getElementById('m-status').value=m?m.status:'待複審';
   document.getElementById('m-date-zh').value=m?m.dateZh||'':'';
   document.getElementById('m-date-en').value=m?m.dateEn||'':'';
   document.getElementById('ops-modal').classList.add('open');
