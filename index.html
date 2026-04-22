@@ -308,7 +308,20 @@ function parseCoord(v) {
   const n = parseFloat(v);
   return isNaN(n) ? null : n;
 }
-const hasCoords = (a) => parseCoord(a.lat) !== null && parseCoord(a.lng) !== null;
+
+/**
+ * 完整座標有效性驗證：
+ * 1. 兩個欄位都能解析為數字
+ * 2. lat 必須在 -90~90（排除經緯度填反的情況，台灣經度 ~121 > 90 會觸發 Mapbox 錯誤）
+ * 3. lng 必須在 -180~180
+ */
+const hasCoords = (a) => {
+  const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+  if (lat === null || lng === null) return false;
+  if (lat < -90  || lat > 90)  return false;  // 排除填反（台灣經度 ~121 > 90）
+  if (lng < -180 || lng > 180) return false;
+  return true;
+};
 
 /** 排除系統預設中心點假座標（南投 120.962, 23.448） */
 const DUMMY_LAT = 23.448446802266, DUMMY_LNG = 120.96249165306, DUMMY_THR = 0.05;
@@ -1949,8 +1962,11 @@ function buildArticleContext(articles, maxContentChars = 400) {
     if (a.hasSight && a.sightKw) haves.push(`景點(${a.sightKw})`);
     if (a.hasEvent && a.eventKw) haves.push(`活動(${a.eventKw})`);
     if (haves.length) parts.push(haves.join(' '));
-    if (hasRealCoords(a)) {
-      parts.push(`座標:(${parseCoord(a.lat).toFixed(3)},${parseCoord(a.lng).toFixed(3)})`);
+    const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+    const coordsValid = lat !== null && lng !== null
+      && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    if (coordsValid && hasRealCoords(a)) {
+      parts.push(`座標:(${lat.toFixed(3)},${lng.toFixed(3)})`);
     } else {
       parts.push('座標:無');
     }
@@ -3191,7 +3207,9 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
       geotagged.forEach((a) => {
         if (stopIds.has(a.id)) return;
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+        // 嚴格範圍檢查，排除填反或無效座標
         if (lat === null || lng === null) return;
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
 
         // 用 buildDotElement 建立雙層 DOM（dot + card）
         const el = buildDotElement(a);
@@ -3233,6 +3251,8 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
         const a = s.article;
         if (!hasRealCoords(a)) return;
         const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
+        // 最終防線：確保數值在合法範圍，避免 Mapbox 拋出 Invalid LngLat
+        if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
         const activeCls = activeKey === s.key ? ' active' : '';
         const estCls    = s.estimated ? ' estimated' : '';
         const el = document.createElement('div');
@@ -3297,6 +3317,7 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
     if (!s) return;
     if (!hasRealCoords(s.article)) return;
     const lat = parseCoord(s.article.lat), lng = parseCoord(s.article.lng);
+    if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
     map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 12), duration: 900 });
     const marker = markersRef.current.get(activeKey);
     if (marker) marker.togglePopup();
