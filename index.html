@@ -1700,7 +1700,9 @@ function Chip({ children, color = '#F2F1EE', text = '#6B6B6B' }) {
    【J】Tab 4: AI Travel Planner — 真正的 Gemini API 整合
    ============================================================ */
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash-lite'];
+// gemini-2.0-flash 排第一：穩定快速、JSON mode 支援佳、非思考型
+// gemini-2.5-flash 作備援：思考型模型，理解力強但速度慢
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
 
 const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner. Your job is to select stops from a pre-filtered article database and arrange them into a coherent, geographically logical itinerary.
 
@@ -2071,7 +2073,7 @@ ${context}
           generationConfig: {
             responseMimeType: 'application/json',
             temperature: 0.5,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
           },
         }),
       });
@@ -2080,7 +2082,11 @@ ${context}
         lastErr = new Error(`${model}: ${data.error.message || data.error.code}`);
         continue;
       }
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      // 思考型模型（gemini-2.5-flash）的 response 結構：
+      // parts = [{thought: true, text: '<thinking>'}, {text: '<actual JSON>'}]
+      // 必須取最後一個有 text 的 part，不能直接用 parts[0]
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const text = (parts.findLast ? parts.findLast(p => p.text) : [...parts].reverse().find(p => p.text))?.text;
       if (!text) { lastErr = new Error(`${model}: empty response`); continue; }
 
       // Strip any accidental fencing
@@ -2487,11 +2493,11 @@ function TravelPlanner({ articles }) {
       return;
     }
 
-    // 資訊充足，直接送出
+    // 資訊充足，直接生成行程（跳過 clarify API 呼叫，減少一次等待）
     setQuery(q);
     setClarification(null);
     setPreCheck(null);
-    runApi(q, key, true);
+    runApi(q, key, false);
   };
 
   /**
@@ -2522,7 +2528,7 @@ function TravelPlanner({ articles }) {
     setQuery(augmented);
     setPreCheck(null);
     setClarification(null);
-    runApi(augmented, key, true);
+    runApi(augmented, key, false);  // 前端已引導完畢，直接生成行程
   }, [draft, runApi]);
 
   /* ── 使用者點選選項按鈕 → 合併需求 → 直接要行程 ── */
@@ -3294,11 +3300,46 @@ function PlannerMap({ geotagged, stops, activeKey, onMarkerClick }) {
 }
 
 /* ============================================================
+   ErrorBoundary — 防止 render 錯誤導致整頁白畫面
+   ============================================================ */
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  componentDidCatch(e, info) { console.error('[IST ErrorBoundary]', e, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+          height:'100vh',gap:'12px',background:'#F8F7F5',
+          fontFamily:'-apple-system,"PingFang TC",sans-serif'}}>
+          <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'#FEE2E2',
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px'}}>⚠️</div>
+          <div style={{fontSize:'14px',fontWeight:'500',color:'#1C1C1C'}}>頁面發生錯誤</div>
+          <div style={{fontSize:'12px',color:'#B91C1C',background:'#FEE2E2',padding:'10px 16px',
+            borderRadius:'6px',maxWidth:'420px',textAlign:'center',lineHeight:'1.6'}}>
+            {this.state.error.message}
+          </div>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{fontSize:'12px',padding:'8px 20px',background:'#C8621E',color:'#fff',
+              border:'none',borderRadius:'6px',cursor:'pointer',marginTop:'4px'}}>
+            重新載入
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ============================================================
    Mount
    ============================================================ */
 
 window.__GEMINI_KEY__ = localStorage.getItem('gemini_key') || '';
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(
+  <ErrorBoundary><App /></ErrorBoundary>
+);
 </script>
 
 </body>
