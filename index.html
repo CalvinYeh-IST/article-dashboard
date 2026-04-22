@@ -1702,7 +1702,7 @@ function Chip({ children, color = '#F2F1EE', text = '#6B6B6B' }) {
 
 // gemini-2.0-flash 排第一：穩定快速、JSON mode 支援佳、非思考型
 // gemini-2.5-flash 作備援：思考型模型，理解力強但速度慢
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash-exp'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
 const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner. Your job is to select stops from a pre-filtered article database and arrange them into a coherent, geographically logical itinerary.
 
@@ -2089,8 +2089,14 @@ ${context}
       const text = (parts.findLast ? parts.findLast(p => p.text) : [...parts].reverse().find(p => p.text))?.text;
       if (!text) { lastErr = new Error(`${model}: empty response`); continue; }
 
-      // Strip any accidental fencing
-      const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      // Strip any accidental fencing or leading/trailing text before the JSON object
+      const fenceStripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      // Find the first { and last } to extract just the JSON object
+      const firstBrace = fenceStripped.indexOf('{');
+      const lastBrace  = fenceStripped.lastIndexOf('}');
+      const cleaned = (firstBrace !== -1 && lastBrace !== -1)
+        ? fenceStripped.slice(firstBrace, lastBrace + 1)
+        : fenceStripped;
       try {
         const parsed = JSON.parse(cleaned);
         return { result: parsed, model, rawText: text };
