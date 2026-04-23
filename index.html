@@ -2514,8 +2514,12 @@ async function callCustomPlanner({ userQuery, articles, apiKey, signal, isClarif
   }
   // 確保 baseUrl 結尾不多一個 /
   const base = baseUrl.replace(/\/+$/, '');
+  // 自動補 /v1：若 base URL 未含版本路徑，則補上；避免 404 HTML 回傳
+  const endpoint = /\/v\d/.test(base)
+    ? base + '/chat/completions'
+    : base + '/v1/chat/completions';
   try {
-    const resp = await fetch(base + '/chat/completions', {
+    const resp = await fetch(endpoint, {
       method: 'POST', signal,
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
