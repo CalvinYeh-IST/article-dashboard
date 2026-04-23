@@ -288,7 +288,7 @@ const KPI_TARGETS = {
 // Lock screen settings — identical to original index.html
 const PASS_HASH    = '737921ff5998fbb8263da00586b664998716f84bf1f9a09246d725d88bc9bd0b';
 const SESSION_TTL  = 8 * 60 * 60 * 1000; // 8 hours
-const SESSION_KEY  = 'ist_dash_auth';
+const SESSION_KEY  = 'ist_dash_auth_v2';
 
 // Colours (IST design tokens)
 const C = {
@@ -2869,7 +2869,7 @@ function InlineKeySetup({ onSaved }) {
 }
 
 function TravelPlanner({ articles }) {
-
+  const [draft, setDraft]           = useState('');
   const [query, setQuery]           = useState('');
   const [plan, setPlan]             = useState(null);
   const [busy, setBusy]             = useState(false);
