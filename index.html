@@ -1928,19 +1928,18 @@ function buildIntentSummary(intent) {
     intent.isFood    && '使用者偏好：美食/小吃/店家導向',
     intent.isNature  && '使用者偏好：自然生態導向',
     intent.isCulture && '使用者偏好：文化歷史導向',
-  ].filter(Boolean).join('
-');
+  ].filter(Boolean).join('\n');
 }
 
 /** 共用：clarify 階段 prompt */
 function buildClarifyPrompt(userQuery, stats, available) {
-  return '你是一位熟悉台灣在地旅遊的私人管家，正在為旅客規劃行程。
+  return `你是一位熟悉台灣在地旅遊的私人管家，正在為旅客規劃行程。
 
 【 旅客的初步需求 】
-' + userQuery + '
+${userQuery}
 
-【 我們資料庫在「' + stats.location + '」的現有內容分布 】
-共 ' + stats.total + ' 篇文章，包含：' + (available.join('、') || '各類主題') + '
+【 我們資料庫在「${stats.location}」的現有內容分布 】
+共 ${stats.total} 篇文章，包含：${available.join('、') || '各類主題'}
 
 【 你的任務 】
 根據旅客的需求與上方資料庫實際有的內容分布，提出「一個」最能幫助你精準規劃行程的問題。
@@ -1952,23 +1951,23 @@ function buildClarifyPrompt(userQuery, stats, available) {
   "action": "clarify",
   "message": "用親切在地口吻問一個問題（繁體中文，2-3句話）",
   "options": ["選項A", "選項B", "選項C", "讓我來幫你搭配就好！"]
-}';
+}`;
 }
 
 /** 共用：planning 階段 prompt */
 function buildPlanPrompt(userQuery, intentSummary, poolCount, context) {
-  return PLANNER_SYSTEM_PROMPT + '
+  return PLANNER_SYSTEM_PROMPT + `
 
 【 前端已完成的智慧篩選 — 請嚴格遵守 】
-' + (intentSummary || '無特定地區或內容偏好') + '
+${intentSummary || '無特定地區或內容偏好'}
 ⚠️ 本資料庫已預先篩選至正確地區，若你看到其他地區的文章請完全忽略不用。
 
 【 使用者需求與已確認偏好 】
-' + userQuery + '
+${userQuery}
 
-【 可用文章資料庫（已地理篩選，共 ' + poolCount + ' 篇）】
+【 可用文章資料庫（已地理篩選，共 ${poolCount} 篇）】
 欄位：id|標題|城市/區|區域|主題|標籤(s=小吃 sh=店家 g=伴手禮 v=景點 e=活動)|座標(lat,lng 或 -)
-' + context + '
+${context}
 
 【 輸出格式要求 】
 請僅以 JSON 格式回覆，不得包含任何其他文字或 Markdown。JSON schema：
@@ -1979,7 +1978,7 @@ function buildPlanPrompt(userQuery, intentSummary, poolCount, context) {
   "days": [{ "day": 1, "theme": "主題", "stops": [{ "id": 整數, "arrival_time": "09:00", "duration_minutes": 90, "reason": "選站原因" }] }],
   "recommended": [{ "id": 整數, "reason": "推薦理由15字內" }]
 }
-規則：只用資料庫內的 id、每天最多4站、最多4天、recommended 最多5篇不重複。';
+規則：只用資料庫內的 id、每天最多4站、最多4天、recommended 最多5篇不重複。`;
 }
 
 /** 共用：準備 clarify stats + available */
@@ -1996,28 +1995,6 @@ function prepareClarifyStats(articles, userQuery, categoryStats) {
 }
 
 /** 共用：建立精簡 article context */
-function buildArticleContext(articles) {
-  const REGION_SHORT = { '北部':'北','中部':'中','南部':'南','東部':'東','離島':'島' };
-  const THEME_SHORT  = { '文化美食':'美食','自然生態':'生態','常民生活':'常民','藝術文化':'藝文','綜覽台灣':'綜覽' };
-  return articles.map((a) => {
-    const loc    = [a.city, a.area].filter(Boolean).join('/') || '';
-    const region = asArr(a.region).map((r) => REGION_SHORT[r] || r).join('');
-    const theme  = asArr(a.theme).map((t) => THEME_SHORT[t] || t).join('+');
-    const tags = [];
-    if (a.hasSnack && a.snackKw) tags.push('s:' + String(a.snackKw).slice(0,10));
-    if (a.hasStore && a.storeKw) tags.push('sh:' + String(a.storeKw).slice(0,10));
-    if (a.hasGift  && a.giftKw ) tags.push('g:' + String(a.giftKw).slice(0,10));
-    if (a.hasSight && a.sightKw) tags.push('v:' + String(a.sightKw).slice(0,10));
-    if (a.hasEvent && a.eventKw) tags.push('e:' + String(a.eventKw).slice(0,10));
-    if (!tags.length) { const sd = asArr(a.subDir)[0]; if (sd) tags.push(sd.slice(0,4)); }
-    const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-    const coordsOk = lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-    const coord = (coordsOk && hasRealCoords(a)) ? (lat.toFixed(3) + ',' + lng.toFixed(3)) : '-';
-    return a.id + '|' + a.title + '|' + loc + '|' + region + '|' + theme + '|' + tags.join(' ') + '|' + coord;
-  }).join('
-');
-}
-
 /** 統一入口 — 依 localStorage 的 ai_provider 分派 */
 async function callAIPlanner(args) {
   const { provider, key, customUrl, customModel } = getActiveAI();
@@ -2891,8 +2868,8 @@ function InlineKeySetup({ onSaved }) {
   );
 }
 
+function TravelPlanner({ articles }) {
 
-  const [draft, setDraft]           = useState('');
   const [query, setQuery]           = useState('');
   const [plan, setPlan]             = useState(null);
   const [busy, setBusy]             = useState(false);
