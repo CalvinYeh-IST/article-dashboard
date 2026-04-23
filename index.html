@@ -2525,6 +2525,13 @@ async function callCustomPlanner({ userQuery, articles, apiKey, signal, isClarif
         messages: [{ role: 'user', content: prompt }],
       }),
     });
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      const hint = errText.trim().startsWith('<')
+        ? '（伺服器回傳 HTML，請確認 Base URL 格式，例：https://openrouter.ai/api/v1）'
+        : errText.slice(0, 120);
+      throw new Error('HTTP ' + resp.status + ' ' + hint);
+    }
     const data = await resp.json();
     if (data.error) throw new Error(modelName + ': ' + (data.error.message || JSON.stringify(data.error)));
     const text = data.choices?.[0]?.message?.content;
