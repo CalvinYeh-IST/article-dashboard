@@ -545,24 +545,65 @@ function LockScreen({ onUnlock }) {
 }
 
 /* ============================================================
-   【D】Settings Gear — Gemini API Key
+   【D】Settings Gear — 多 Provider AI API Key 設定
+   支援 Gemini / OpenAI / Anthropic
    ============================================================ */
 
+const AI_PROVIDERS = [
+  {
+    id: 'gemini',
+    label: 'Google Gemini',
+    color: '#1A73E8',
+    bgColor: '#E8F0FE',
+    placeholder: 'AIza...',
+    hint: '前往 aistudio.google.com 申請',
+    storageKey: 'ai_key_gemini',
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    color: '#10A37F',
+    bgColor: '#D4F5EC',
+    placeholder: 'sk-...',
+    hint: '前往 platform.openai.com 申請',
+    storageKey: 'ai_key_openai',
+  },
+  {
+    id: 'anthropic',
+    label: 'Anthropic Claude',
+    color: '#C8621E',
+    bgColor: '#FBF0E8',
+    placeholder: 'sk-ant-...',
+    hint: '前往 console.anthropic.com 申請',
+    storageKey: 'ai_key_anthropic',
+  },
+];
+
+/** 取得目前啟用的 provider 與 key */
+function getActiveAI() {
+  const providerId = localStorage.getItem('ai_provider') || 'gemini';
+  const provider   = AI_PROVIDERS.find((p) => p.id === providerId) || AI_PROVIDERS[0];
+  const key        = localStorage.getItem(provider.storageKey) || '';
+  return { provider, key };
+}
+
 function SettingsGear() {
-  const [open, setOpen]     = useState(false);
-  const [val, setVal]       = useState('');
-  const [status, setStatus] = useState({ msg: '', ok: false });
+  const [open, setOpen]         = useState(false);
+  const [activeId, setActiveId] = useState(() => localStorage.getItem('ai_provider') || 'gemini');
+  const [vals, setVals]         = useState(() =>
+    Object.fromEntries(AI_PROVIDERS.map((p) => [p.id, '']))
+  );
+  const [saved, setSaved]       = useState({});  // id → bool 是否已有 key
   const panelRef = useRef(null);
 
-  const refreshStatus = useCallback(() => {
-    const key = localStorage.getItem('gemini_key');
-    setStatus(key
-      ? { msg: 'Key 已設定，AI 查詢功能已啟用', ok: true }
-      : { msg: '尚未設定 Key，AI 查詢功能暫時無法使用', ok: false }
-    );
+  // 初始化：讀取各 provider 的 key 狀態
+  const refreshSaved = useCallback(() => {
+    setSaved(Object.fromEntries(
+      AI_PROVIDERS.map((p) => [p.id, !!localStorage.getItem(p.storageKey)])
+    ));
   }, []);
 
-  useEffect(() => { refreshStatus(); }, [refreshStatus]);
+  useEffect(() => { refreshSaved(); }, [refreshSaved]);
 
   useEffect(() => {
     if (!open) return;
@@ -573,27 +614,44 @@ function SettingsGear() {
     return () => document.removeEventListener('click', onClick);
   }, [open]);
 
-  const save = () => {
-    const v = val.trim();
-    if (!v) { setStatus({ msg: '請貼上你的 Gemini API Key', ok: false }); return; }
-    localStorage.setItem('gemini_key', v);
-    window.__GEMINI_KEY__ = v;
-    setVal('');
-    setStatus({ msg: '儲存成功！AI 查詢功能已啟用', ok: true });
+  const saveKey = (providerId) => {
+    const v = (vals[providerId] || '').trim();
+    const p = AI_PROVIDERS.find((x) => x.id === providerId);
+    if (!v || !p) return;
+    localStorage.setItem(p.storageKey, v);
+    // 儲存後自動切換到這個 provider
+    localStorage.setItem('ai_provider', providerId);
+    setActiveId(providerId);
+    setVals((prev) => ({ ...prev, [providerId]: '' }));
+    refreshSaved();
   };
 
-  const clear = () => {
-    localStorage.removeItem('gemini_key');
-    window.__GEMINI_KEY__ = '';
-    refreshStatus();
+  const clearKey = (providerId) => {
+    const p = AI_PROVIDERS.find((x) => x.id === providerId);
+    if (!p) return;
+    localStorage.removeItem(p.storageKey);
+    // 若清除的是目前啟用的，切回 gemini
+    if (activeId === providerId) {
+      localStorage.setItem('ai_provider', 'gemini');
+      setActiveId('gemini');
+    }
+    refreshSaved();
   };
+
+  const switchProvider = (providerId) => {
+    if (!saved[providerId]) return;  // 沒有 key 就不給切
+    localStorage.setItem('ai_provider', providerId);
+    setActiveId(providerId);
+  };
+
+  const anyKeySet = AI_PROVIDERS.some((p) => saved[p.id]);
 
   return (
     <>
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
         className="fixed top-3 right-3 md:top-4 md:right-5 w-9 h-9 rounded-full bg-white border border-[#D3D1C7] flex items-center justify-center text-[#6B6B6B] hover:bg-[#F2F1EE] z-[800] shadow-sm"
-        title="API 設定"
+        title="AI API 設定"
       >
         <Settings size={15} strokeWidth={1.5} />
       </button>
@@ -602,44 +660,89 @@ function SettingsGear() {
         <div
           ref={panelRef}
           onClick={(e) => e.stopPropagation()}
-          className="fixed top-[58px] right-5 w-[360px] bg-white border border-[#E8E8E4] rounded-xl p-5 z-[200] shadow-xl"
+          className="fixed top-[58px] right-5 w-[380px] bg-white border border-[#E8E8E4] rounded-xl p-5 z-[200] shadow-xl"
         >
+          {/* Header */}
           <div className="flex items-center gap-2 mb-1">
             <KeyRound size={14} strokeWidth={1.5} className="text-[#C8621E]" />
-            <h4 className="text-[13px] font-medium text-[#1C1C1C]">Gemini API Key 設定</h4>
+            <h4 className="text-[13px] font-medium text-[#1C1C1C]">AI API Key 設定</h4>
           </div>
-          <p className="text-[11px] text-[#888780] mb-3 leading-relaxed">
-            每個人用自己申請的 Gemini API Key 即可。
-            <br />Key 只存在你的瀏覽器本機，不會上傳到任何地方。
-            <br />換電腦或清除瀏覽器資料後需重新貼上。
+          <p className="text-[11px] text-[#888780] mb-4 leading-relaxed">
+            使用自己申請的 API Key，Key 只存在瀏覽器本機不會上傳。
+            <br />設定多組後可自由切換使用哪個 AI。
           </p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && save()}
-              placeholder={localStorage.getItem('gemini_key') ? 'Key 已設定（貼上新 Key 可覆蓋）' : '貼上你的 Gemini API Key'}
-              className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg border border-[#D3D1C7] bg-white text-[#1C1C1C] outline-none focus:border-[#C8621E] font-mono"
-            />
-            <button
-              onClick={save}
-              className="text-[12px] px-3 py-1.5 rounded-lg border border-[#B5D4F4] bg-[#E6F1FB] text-[#185FA5] hover:bg-[#B5D4F4] font-medium whitespace-nowrap"
-            >儲存</button>
+
+          {/* Provider 列表 */}
+          <div className="flex flex-col gap-3">
+            {AI_PROVIDERS.map((p) => {
+              const isActive = activeId === p.id;
+              const hasSaved = saved[p.id];
+              return (
+                <div
+                  key={p.id}
+                  className={`rounded-xl border p-3 transition-all ${
+                    isActive && hasSaved
+                      ? 'border-[#C8621E] bg-[#FBF0E8]'
+                      : 'border-[#E8E8E4] bg-white'
+                  }`}
+                >
+                  {/* Provider 標頭列 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {/* 狀態燈 */}
+                      <div className={`w-2 h-2 rounded-full ${hasSaved ? 'bg-[#1A6B45]' : 'bg-[#D3D1C7]'}`} />
+                      <span className="text-[12px] font-semibold text-[#1C1C1C]">{p.label}</span>
+                      {isActive && hasSaved && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#C8621E] text-white font-medium uppercase tracking-wide">使用中</span>
+                      )}
+                    </div>
+                    {hasSaved && !isActive && (
+                      <button
+                        onClick={() => switchProvider(p.id)}
+                        className="text-[10px] px-2 py-0.5 rounded-md border border-[#C8621E] text-[#C8621E] hover:bg-[#FBF0E8]"
+                      >切換使用</button>
+                    )}
+                  </div>
+
+                  {/* Key 輸入列 */}
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={vals[p.id] || ''}
+                      onChange={(e) => setVals((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && saveKey(p.id)}
+                      placeholder={hasSaved ? 'Key 已設定（貼上新 Key 可覆蓋）' : p.placeholder}
+                      className="flex-1 text-[11px] px-2 py-1.5 rounded-lg border border-[#D3D1C7] bg-white text-[#1C1C1C] outline-none focus:border-[#C8621E] font-mono"
+                    />
+                    <button
+                      onClick={() => saveKey(p.id)}
+                      className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[#B5D4F4] bg-[#E6F1FB] text-[#185FA5] hover:bg-[#B5D4F4] font-medium whitespace-nowrap"
+                    >儲存</button>
+                  </div>
+
+                  {/* 申請連結 + 清除 */}
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] text-[#9A9A96]">{p.hint}</span>
+                    {hasSaved && (
+                      <button
+                        onClick={() => clearKey(p.id)}
+                        className="text-[10px] text-[#9A9A96] hover:text-[#B91C1C]"
+                      >清除</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div
-            className={`text-[11px] mt-2 px-2.5 py-1.5 rounded-md ${
-              status.ok ? 'bg-[#EAF3DE] text-[#3B6D11]' : 'bg-[#FAEEDA] text-[#854F0B]'
-            }`}
-          >
-            {status.msg}
+
+          {/* 整體狀態 */}
+          <div className={`text-[11px] mt-3 px-2.5 py-1.5 rounded-md ${
+            anyKeySet ? 'bg-[#EAF3DE] text-[#3B6D11]' : 'bg-[#FAEEDA] text-[#854F0B]'
+          }`}>
+            {anyKeySet
+              ? `目前使用：${AI_PROVIDERS.find((p) => p.id === activeId)?.label || '—'}`
+              : '尚未設定任何 Key，請至少設定一組才能使用 AI 功能'}
           </div>
-          {localStorage.getItem('gemini_key') && (
-            <button
-              onClick={clear}
-              className="mt-2 text-[10px] text-[#9A9A96] hover:text-[#B91C1C]"
-            >清除已儲存的 Key</button>
-          )}
         </div>
       )}
     </>
@@ -1715,278 +1818,30 @@ function Chip({ children, color = '#F2F1EE', text = '#6B6B6B' }) {
 
 // gemini-2.0-flash 排第一：穩定快速、JSON mode 支援佳、非思考型
 // gemini-2.5-flash 作備援：思考型模型，理解力強但速度慢
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
+const GEMINI_MODELS   = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash'];
+const OPENAI_MODELS   = ['gpt-4o-mini', 'gpt-4o'];
+const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
 
-const PLANNER_SYSTEM_PROMPT = `You are an expert Taiwan travel planner. Your job is to select stops from a pre-filtered article database and arrange them into a coherent, geographically logical itinerary.
-
-ABSOLUTE RULES — VIOLATION IS NOT PERMITTED:
-
-1. REGION LOCK 🔒
-   The database has already been pre-filtered to the correct region(s) for this request.
-   NEVER select articles whose 區域 field does not match the user's intended region.
-   - 東部 trips = only 花蓮/台東 articles. NEVER pick 離島, 南部, 北部, or 中部 articles.
-   - 離島 trips = only 離島 articles. NEVER mix 離島 with mainland Taiwan.
-   - 北部/中部/南部 trips = stay in that region. Do not cross into other regions.
-   - If articles from another region appear in the database, SKIP THEM ENTIRELY.
-
-2. CONTENT TYPE MATCHING 🎯
-   The user's stated preferences (e.g. 美食, 自然生態, 文化) MUST drive stop selection.
-   - 美食/小吃/料理 trip → MUST prefer stops where hasSnack=true OR hasStore=true OR subDir contains 料理/食材/食品. Scenic-only articles (hasSight-only, no food tags) should be secondary.
-   - 自然生態 trip → prefer stops where hasSight=true AND theme=自然生態, or subDir contains 山川森林/海洋島嶼.
-   - 文化/歷史 trip → prefer subDir 民俗節慶/宗教信仰/生活型態/地域風土 or hasEvent=true.
-   - 綜合/平衡 trip → mix content types evenly across the days.
-
-3. GEOGRAPHIC CLUSTERING 📍
-   Each day must stay within the same city or adjacent townships.
-   Minimum 40 min travel buffer between stops. Maximum 4 stops per day. Maximum 4 days total.
-
-4. ANCHOR = 地點[錨點] ONLY
-   The 地點[錨點] field (city/area) is the ONLY authoritative location for routing.
-   Article body text mentioning city names is irrelevant — ignore it.
-
-5. DATABASE ONLY
-   Only use integer IDs present in the provided database. Never invent IDs or places.
-
-6. NO-COORD ARTICLES (座標:無)
-   Group with same-city stops, or place in "recommended" array if off-route.
-
-7. RECOMMENDED (max 5, no duplicates with stops)
-   Use for thematically relevant articles that can't be physical stops.
-
-If feasibility is impossible, explain why and still provide the best realistic alternative.`;
-
-
-/**
- * 從使用者輸入解析「地理意圖」與「內容偏好意圖」
- */
-function detectQueryIntent(queryText) {
-  // 地區關鍵詞 → region 欄位值
-  const REGION_MAP = {
-    '東部': ['東部'], '花蓮': ['東部'], '台東': ['東部'], '太魯閣': ['東部'],
-    '北部': ['北部'], '台北': ['北部'], '新北': ['北部'], '基隆': ['北部'],
-    '桃園': ['北部'], '新竹': ['北部'], '宜蘭': ['北部'], '苗栗': ['北部'],
-    '中部': ['中部'], '台中': ['中部'], '彰化': ['中部'], '南投': ['中部'],
-    '雲林': ['中部'], '嘉義': ['中部'],
-    '南部': ['南部'], '台南': ['南部'], '高雄': ['南部'], '屏東': ['南部'],
-    '離島': ['離島'], '澎湖': ['離島'], '金門': ['離島'], '馬祖': ['離島'],
-    '綠島': ['離島'], '小琉球': ['離島'], '蘭嶼': ['離島'],
-  };
-
-  // 城市關鍵詞（用來補強 city 欄位篩選）
-  const CITY_MAP = {
-    '台北': '台北', '新北': '新北', '基隆': '基隆', '桃園': '桃園', '新竹': '新竹',
-    '苗栗': '苗栗', '台中': '台中', '彰化': '彰化', '南投': '南投', '雲林': '雲林',
-    '嘉義': '嘉義', '台南': '台南', '高雄': '高雄', '屏東': '屏東', '宜蘭': '宜蘭',
-    '花蓮': '花蓮', '台東': '台東', '澎湖': '澎湖', '金門': '金門', '馬祖': '馬祖',
-  };
-
-  const detectedRegions = new Set();
-  const detectedCities  = [];
-
-  for (const [kw, rs] of Object.entries(REGION_MAP)) {
-    if (queryText.includes(kw)) rs.forEach((r) => detectedRegions.add(r));
-  }
-  for (const [kw, city] of Object.entries(CITY_MAP)) {
-    if (queryText.includes(kw)) detectedCities.push(city);
-  }
-
-  // 內容偏好
-  const FOOD_KW    = ['美食', '小吃', '吃', '料理', '食', '餐', '夜市', '伴手禮', '特產'];
-  const NATURE_KW  = ['自然', '生態', '山', '海', '森林', '峽谷', '瀑布', '野生', '珊瑚'];
-  const CULTURE_KW = ['文化', '歷史', '古蹟', '廟', '藝術', '老街', '傳統', '節慶', '博物館'];
-  const RELAX_KW   = ['輕鬆', '悠閒', '慢旅', '步調', '散步'];
-
-  const isFood    = FOOD_KW.some((k)    => queryText.includes(k));
-  const isNature  = NATURE_KW.some((k)  => queryText.includes(k));
-  const isCulture = CULTURE_KW.some((k) => queryText.includes(k));
-  const isRelax   = RELAX_KW.some((k)   => queryText.includes(k));
-
-  return {
-    regions: [...detectedRegions],
-    cities:  detectedCities,
-    isFood, isNature, isCulture, isRelax,
-  };
+/* ── JSON 提取工具 ── */
+function extractJson(text) {
+  const fence = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/,'').trim();
+  const first = fence.indexOf('{'), last = fence.lastIndexOf('}');
+  return (first !== -1 && last !== -1) ? fence.slice(first, last + 1) : fence;
 }
 
-/**
- * 從查詢文字中解析天數。找不到回傳 null。
- */
-function detectDays(q) {
-  const patterns = [
-    [/一天|1\s*天|half.?day|day.?trip|one.?day/i, 1],
-    [/兩天|二天|2\s*天|two.?day/i, 2],
-    [/三天|3\s*天|three.?day/i, 3],
-    [/四天|4\s*天|four.?day/i, 4],
-    [/五天|5\s*天|five.?day/i, 5],
-    [/六天|6\s*天|six.?day/i, 6],
-    [/七天|一週|一周|7\s*天|a?\s*week/i, 7],
-    [/週末|周末|weekend/i, 2],
-  ];
-  for (const [re, days] of patterns) {
-    if (re.test(q)) return days;
-  }
-  return null;
+/* ── 共用 prompt 建構函式 ── */
+function buildIntentSummary(intent) {
+  return [
+    intent.regions.length > 0 && `目標地區：${intent.regions.join('、')}`,
+    intent.cities.length  > 0 && `目標城市：${intent.cities.join('、')}`,
+    intent.isFood    && '使用者偏好：美食/小吃/店家導向',
+    intent.isNature  && '使用者偏好：自然生態導向',
+    intent.isCulture && '使用者偏好：文化歷史導向',
+  ].filter(Boolean).join('\n');
 }
 
-/**
- * 判斷查詢是否過於模糊而缺乏風格偏好。
- * 短查詢、情緒性需求、探索型需求都視為 vague。
- */
-function isQueryVague(q, intent) {
-  if (intent.isFood || intent.isNature || intent.isCulture) return false; // 已有明確偏好
-  const VAGUE_WORDS = [
-    '沉靜', '放鬆', '療癒', '充電', '慢旅', '散心', '度假',
-    '吃喝玩樂', '有哪些', '有什麼', '推薦', '不知道', '隨便',
-    '都可以', '看看', 'travel', 'trip', 'visit', 'explore',
-    '想來台灣', '來玩', '旅遊', '旅行', '觀光',
-  ];
-  return q.length < 25 || VAGUE_WORDS.some((w) => q.includes(w));
-}
-
-/** 風格選項定義（前端用，不走 AI） */
-const STYLE_OPTIONS = [
-  { key: 'food',    emoji: '🍜', label: '美食小吃', desc: '夜市、料理、在地小吃' },
-  { key: 'nature',  emoji: '🏔️', label: '山海自然', desc: '峽谷、海岸、生態景觀' },
-  { key: 'culture', emoji: '🏛️', label: '文化歷史', desc: '古蹟、廟宇、傳統藝術' },
-  { key: 'mix',     emoji: '✨', label: '綜合探索', desc: '幫我搭配最好的組合' },
-];
-
-/**
- * 根據意圖智慧篩選與排序文章，確保送給 Gemini 的池子地理正確、內容相符。
- * 這是解決「東部旅遊跑出離島」和「美食之旅全是景點」的核心修復。
- */
-function buildSmartPool(articles, intent) {
-  const FOOD_SUBDIRS    = new Set(['料理', '食材', '食品', '地方特色']);
-  const NATURE_SUBDIRS  = new Set(['山川森林', '海洋島嶼', '地域風土']);
-  const CULTURE_SUBDIRS = new Set(['民俗節慶', '宗教信仰', '表演', '音樂', '美術', '文學', '人物', '生活型態']);
-
-  // ── 第一步：地理硬篩（最關鍵） ──
-  let geoPool = articles;
-  if (intent.regions.length > 0) {
-    const regionFiltered = articles.filter((a) => {
-      const artRegions = asArr(a.region);
-      return intent.regions.some((r) => artRegions.includes(r));
-    });
-    // 保底：若篩出來太少則退回全庫（避免空行程）
-    geoPool = regionFiltered.length >= 5 ? regionFiltered : articles;
-  }
-
-  // 城市更精確篩選（有城市關鍵詞時，在地區篩選結果上再縮小）
-  if (intent.cities.length > 0 && intent.regions.length > 0) {
-    const cityFiltered = geoPool.filter((a) =>
-      intent.cities.some((c) => (a.city || '').includes(c) || (a.area || '').includes(c))
-    );
-    if (cityFiltered.length >= 5) geoPool = cityFiltered;
-  }
-
-  // ── 第二步：內容偏好排序（軟排，不硬刪） ──
-  const score = (a) => {
-    let s = 0;
-    const subdirs = new Set(asArr(a.subDir));
-
-    if (intent.isFood) {
-      if (a.hasSnack) s += 30;
-      if (a.hasStore) s += 20;
-      if (a.hasGift)  s += 10;
-      if ([...subdirs].some((d) => FOOD_SUBDIRS.has(d)))    s += 15;
-      if (asArr(a.theme).includes('文化美食'))               s += 10;
-    }
-    if (intent.isNature) {
-      if (a.hasSight) s += 20;
-      if ([...subdirs].some((d) => NATURE_SUBDIRS.has(d)))  s += 25;
-      if (asArr(a.theme).includes('自然生態'))               s += 15;
-    }
-    if (intent.isCulture) {
-      if (a.hasEvent) s += 20;
-      if ([...subdirs].some((d) => CULTURE_SUBDIRS.has(d))) s += 25;
-      if (asArr(a.theme).some((t) => ['藝術文化', '常民生活'].includes(t))) s += 15;
-    }
-    // 有座標的文章加分（更容易成為實體停靠站）
-    if (hasRealCoords(a)) s += 5;
-    return s;
-  };
-
-  // 有意圖偏好時排序，無偏好時保持原序
-  const hasIntent = intent.isFood || intent.isNature || intent.isCulture;
-  const sorted = hasIntent
-    ? [...geoPool].sort((a, b) => score(b) - score(a))
-    : geoPool;
-
-  // ── 第三步：限制上限，避免 prompt 過長 ──
-  const withCoords    = sorted.filter(hasRealCoords);
-  const withoutCoords = sorted.filter((a) => !hasRealCoords(a));
-
-  // 無座標：隨機取 5 篇當 recommended 備用（固定不隨天數膨脹）
-  const shuffled = [...withoutCoords].sort(() => Math.random() - 0.5);
-  return [...withCoords, ...shuffled.slice(0, 5)];
-}
-
-/**
- * 分析資料庫分佈（用於 clarify 提問）
- */
-function computeCategoryStats(articles, queryText = '') {
-  const intent = detectQueryIntent(queryText);
-  const pool   = buildSmartPool(articles, intent);
-  return {
-    snack:    pool.filter((a) => a.hasSnack).length,
-    store:    pool.filter((a) => a.hasStore).length,
-    gift:     pool.filter((a) => a.hasGift).length,
-    sight:    pool.filter((a) => a.hasSight).length,
-    event:    pool.filter((a) => a.hasEvent).length,
-    total:    pool.length,
-    location: intent.cities.length  > 0 ? intent.cities.join('、')
-            : intent.regions.length > 0 ? intent.regions.join('、')
-            : '全台',
-  };
-}
-
-
-/** Build compact article context for Gemini — 極簡格式，省 token
- *  格式：id|標題|城市/區|區域縮寫|主題縮寫|標籤|座標或-
- *  範例：42|台南安平豆花|台南/安平|南|美食|s:豆花古早味|22.994,120.161
- */
-function buildArticleContext(articles) {
-  const REGION_SHORT = { '北部':'北','中部':'中','南部':'南','東部':'東','離島':'島' };
-  const THEME_SHORT  = { '文化美食':'美食','自然生態':'生態','常民生活':'常民','藝術文化':'藝文','綜覽台灣':'綜覽' };
-
-  return articles.map((a) => {
-    const loc    = [a.city, a.area].filter(Boolean).join('/') || '';
-    const region = asArr(a.region).map((r) => REGION_SHORT[r] || r).join('');
-    const theme  = asArr(a.theme).map((t) => THEME_SHORT[t] || t).join('+');
-
-    const tags = [];
-    if (a.hasSnack && a.snackKw) tags.push(`s:${String(a.snackKw).slice(0,10)}`);
-    if (a.hasStore && a.storeKw) tags.push(`sh:${String(a.storeKw).slice(0,10)}`);
-    if (a.hasGift  && a.giftKw ) tags.push(`g:${String(a.giftKw).slice(0,10)}`);
-    if (a.hasSight && a.sightKw) tags.push(`v:${String(a.sightKw).slice(0,10)}`);
-    if (a.hasEvent && a.eventKw) tags.push(`e:${String(a.eventKw).slice(0,10)}`);
-    if (!tags.length) { const sd = asArr(a.subDir)[0]; if (sd) tags.push(sd.slice(0,4)); }
-
-    const lat = parseCoord(a.lat), lng = parseCoord(a.lng);
-    const coordsValid = lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-    const coord = (coordsValid && hasRealCoords(a)) ? `${lat.toFixed(3)},${lng.toFixed(3)}` : '-';
-
-    return `${a.id}|${a.title}|${loc}|${region}|${theme}|${tags.join(' ')}|${coord}`;
-  }).join('\n');
-}
-
-async function callGeminiPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
-  const intent = detectQueryIntent(userQuery);
-
-  let prompt = '';
-
-  if (isClarifyPhase) {
-    // ── 第一階段：只送統計數字，不帶 context，省 token ──
-    const stats = categoryStats || computeCategoryStats(articles, userQuery);
-    const available = [
-      stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
-      stats.store > 0 && `特色店家（${stats.store} 篇）`,
-      stats.sight > 0 && `景點探索（${stats.sight} 篇）`,
-      stats.gift  > 0 && `伴手禮採買（${stats.gift} 篇）`,
-      stats.event > 0 && `活動體驗（${stats.event} 篇）`,
-    ].filter(Boolean);
-
-    prompt = `你是一位熟悉台灣在地旅遊的私人管家，正在為旅客規劃行程。
+function buildClarifyPrompt(userQuery, stats, available) {
+  return `你是一位熟悉台灣在地旅遊的私人管家，正在為旅客規劃行程。
 
 【 旅客的初步需求 】
 ${userQuery}
@@ -1997,30 +1852,19 @@ ${userQuery}
 【 你的任務 】
 根據旅客的需求與上方資料庫實際有的內容分布，提出「一個」最能幫助你精準規劃行程的問題。
 問題要基於資料庫實際有的內容來問（例如：若小吃篇數最多，就問他想不想多安排美食行程）。
-不要問資料庫沒有對應內容的問題。
-語氣請像在地熱情的旅遊顧問。
+不要問資料庫沒有對應內容的問題。語氣請像在地熱情的旅遊顧問。
 
 【 輸出格式 】
 只能回傳 JSON，不得包含任何其他文字或 markdown：
 {
   "action": "clarify",
-  "message": "用親切在地口吻問一個問題，可以提到我們資料庫裡有什麼（繁體中文，2-3句話）",
+  "message": "用親切在地口吻問一個問題（繁體中文，2-3句話）",
   "options": ["選項A", "選項B", "選項C", "讓我來幫你搭配就好！"]
 }`;
-  } else {
-    // ── 第二階段：依確認偏好輸出行程（此時才建 context，clarify 不需要）──
-    const poolArticles = buildSmartPool(articles, intent);
-    const context      = buildArticleContext(poolArticles);
-    // 生成意圖摘要，明確告訴 Gemini 這個池子是怎麼來的
-    const intentSummary = [
-      intent.regions.length > 0 && `目標地區：${intent.regions.join('、')}`,
-      intent.cities.length  > 0 && `目標城市：${intent.cities.join('、')}`,
-      intent.isFood    && '使用者偏好：美食/小吃/店家導向，請優先選擇有 hasSnack 或 hasStore 標記的文章',
-      intent.isNature  && '使用者偏好：自然生態導向，請優先選擇 theme=自然生態 或 subDir 含山川/海洋的文章',
-      intent.isCulture && '使用者偏好：文化歷史導向，請優先選擇 subDir 含民俗節慶/宗教/藝術的文章',
-    ].filter(Boolean).join('\n');
+}
 
-    prompt = `${PLANNER_SYSTEM_PROMPT}
+function buildPlanPrompt(userQuery, intentSummary, poolCount, context) {
+  return `${PLANNER_SYSTEM_PROMPT}
 
 【 前端已完成的智慧篩選 — 請嚴格遵守 】
 ${intentSummary || '無特定地區或內容偏好，請依需求自行判斷'}
@@ -2029,97 +1873,159 @@ ${intentSummary || '無特定地區或內容偏好，請依需求自行判斷'}
 【 使用者需求與已確認偏好 】
 ${userQuery}
 
-【 可用文章資料庫（已地理篩選，共 ${poolArticles.length} 篇） 】
+【 可用文章資料庫（已地理篩選，共 ${poolCount} 篇）】
+欄位：id|標題|城市/區|區域|主題|標籤(s=小吃 sh=店家 g=伴手禮 v=景點 e=活動)|座標(lat,lng 或 -)
 ${context}
 
 【 輸出格式要求 】
-請僅以 JSON 格式回覆，不得包含任何其他文字、Markdown 標記或 \`\`\` 區塊。JSON schema：
+請僅以 JSON 格式回覆，不得包含任何其他文字或 Markdown。JSON schema：
 {
   "summary": "2-3 句話的行程概述（繁體中文）",
-  "feasibility": "ok" | "adjusted" | "impossible",
-  "message": "如果 feasibility 是 adjusted 或 impossible，用繁體中文說明原因與建議",
-  "days": [
-    {
-      "day": 1,
-      "theme": "這天的主題（短），例如：大稻埕歷史美食",
-      "stops": [
-        {
-          "id": <資料庫文章的 id，整數>,
-          "arrival_time": "09:00",
-          "duration_minutes": 90,
-          "reason": "為什麼選這站以及在這個順序的原因，繁體中文"
-        }
-      ]
-    }
-  ],
-  "recommended": [
-    { "id": <整數>, "reason": "推薦理由，15字以內" }
-  ]
+  "feasibility": "ok | adjusted | impossible",
+  "message": "若 feasibility 非 ok，用繁體中文說明原因",
+  "days": [{ "day": 1, "theme": "主題", "stops": [{ "id": <整數>, "arrival_time": "09:00", "duration_minutes": 90, "reason": "選站原因" }] }],
+  "recommended": [{ "id": <整數>, "reason": "推薦理由，15字以內" }]
+}
+規則：只用資料庫內的 id、每天最多4站、最多4天、recommended 最多5篇且不重複。`;
 }
 
-規則：
-1. 只能使用上方資料庫中存在的 id（整數）。不要發明 id。
-2. 每天最多 4 站。總共最多 4 天。
-3. 每站之間必須保留至少 40 分鐘交通/緩衝時間（請依台灣實際地理距離判斷）。
-4. 如果使用者的需求不可行，設定 feasibility="impossible"，在 message 解釋，但仍在 days 提供最接近的可行替代方案。
-5. 如果需要調整，設定 feasibility="adjusted"，在 message 解釋調整原因。
-6. 只使用資料庫中提供的資料；不要引入資料庫以外的景點。
-7. recommended 放座標:無但主題高度相符的文章，最多 5 篇，不得與 stops 重複。
-8. 使用者偏好美食時，stops 中至少 2/3 的站點應有 hasSnack=true 或 hasStore=true。
-9. 使用者偏好自然生態時，stops 中的站點應以 theme=自然生態 或 subDir 含山川森林/海洋島嶼為主。
-10. 任何情況下，同一個行程內的所有站點必須在相同或相鄰的縣市，不得跨越不同大區域。`;
-  }
+/* ── 統一 AI 呼叫入口 ── */
+async function callAIPlanner(plannerArgs) {
+  const { provider, key } = getActiveAI();
+  if (!key) throw new Error('尚未設定 API Key，請點右上角齒輪圖示設定');
+  if (provider.id === 'openai')    return callOpenAIPlanner({ ...plannerArgs, apiKey: key });
+  if (provider.id === 'anthropic') return callAnthropicPlanner({ ...plannerArgs, apiKey: key });
+  return callGeminiPlanner({ ...plannerArgs, apiKey: key });
+}
 
+/* ── Gemini ── */
+async function callGeminiPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
+  const intent = detectQueryIntent(userQuery);
+  let prompt = '';
+  if (isClarifyPhase) {
+    const stats = categoryStats || computeCategoryStats(articles, userQuery);
+    const available = [
+      stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
+      stats.store > 0 && `特色店家（${stats.store} 篇）`,
+      stats.sight > 0 && `景點探索（${stats.sight} 篇）`,
+      stats.gift  > 0 && `伴手禮採買（${stats.gift} 篇）`,
+      stats.event > 0 && `活動體驗（${stats.event} 篇）`,
+    ].filter(Boolean);
+    prompt = buildClarifyPrompt(userQuery, stats, available);
+  } else {
+    const poolArticles = buildSmartPool(articles, intent);
+    const context      = buildArticleContext(poolArticles);
+    prompt = buildPlanPrompt(userQuery, buildIntentSummary(intent), poolArticles.length, context);
+  }
   let lastErr = null;
   for (const model of GEMINI_MODELS) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.5,
-            maxOutputTokens: 2048,
-          },
-        }),
-      });
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        { method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.5, maxOutputTokens: 4096 } }) }
+      );
       const data = await resp.json();
-      if (data.error) {
-        lastErr = new Error(`${model}: ${data.error.message || data.error.code}`);
-        continue;
-      }
-      // 思考型模型（gemini-2.5-flash）的 response 結構：
-      // parts = [{thought: true, text: '<thinking>'}, {text: '<actual JSON>'}]
-      // 必須取最後一個有 text 的 part，不能直接用 parts[0]
+      if (data.error) { lastErr = new Error(`${model}: ${data.error.message || data.error.code}`); continue; }
       const parts = data.candidates?.[0]?.content?.parts || [];
-      const text = (parts.findLast ? parts.findLast(p => p.text) : [...parts].reverse().find(p => p.text))?.text;
+      const text  = (parts.findLast ? parts.findLast((p) => p.text) : [...parts].reverse().find((p) => p.text))?.text;
       if (!text) { lastErr = new Error(`${model}: empty response`); continue; }
-
-      // Strip any accidental fencing or leading/trailing text before the JSON object
-      const fenceStripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-      // Find the first { and last } to extract just the JSON object
-      const firstBrace = fenceStripped.indexOf('{');
-      const lastBrace  = fenceStripped.lastIndexOf('}');
-      const cleaned = (firstBrace !== -1 && lastBrace !== -1)
-        ? fenceStripped.slice(firstBrace, lastBrace + 1)
-        : fenceStripped;
-      try {
-        const parsed = JSON.parse(cleaned);
-        return { result: parsed, model, rawText: text };
-      } catch (e) {
-        lastErr = new Error(`${model}: JSON parse failed — ${e.message}`);
-        continue;
-      }
+      try { return { result: JSON.parse(extractJson(text)), model }; }
+      catch (e) { lastErr = new Error(`${model}: JSON parse failed`); continue; }
     } catch (e) {
       if (e.name === 'AbortError') throw e;
       lastErr = new Error(`${model}: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 1500));
     }
   }
   throw lastErr || new Error('All Gemini models failed');
+}
+
+/* ── OpenAI ── */
+async function callOpenAIPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
+  const intent = detectQueryIntent(userQuery);
+  let prompt = '';
+  if (isClarifyPhase) {
+    const stats = categoryStats || computeCategoryStats(articles, userQuery);
+    const available = [
+      stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
+      stats.store > 0 && `特色店家（${stats.store} 篇）`,
+      stats.sight > 0 && `景點探索（${stats.sight} 篇）`,
+      stats.gift  > 0 && `伴手禮採買（${stats.gift} 篇）`,
+      stats.event > 0 && `活動體驗（${stats.event} 篇）`,
+    ].filter(Boolean);
+    prompt = buildClarifyPrompt(userQuery, stats, available);
+  } else {
+    const poolArticles = buildSmartPool(articles, intent);
+    const context      = buildArticleContext(poolArticles);
+    prompt = buildPlanPrompt(userQuery, buildIntentSummary(intent), poolArticles.length, context);
+  }
+  let lastErr = null;
+  for (const model of OPENAI_MODELS) {
+    try {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST', signal,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ model, temperature: 0.5, max_tokens: 4096,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: prompt }] }),
+      });
+      const data = await resp.json();
+      if (data.error) { lastErr = new Error(`${model}: ${data.error.message}`); continue; }
+      const text = data.choices?.[0]?.message?.content;
+      if (!text) { lastErr = new Error(`${model}: empty response`); continue; }
+      try { return { result: JSON.parse(extractJson(text)), model }; }
+      catch (e) { lastErr = new Error(`${model}: JSON parse failed`); continue; }
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      lastErr = new Error(`${model}: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+  throw lastErr || new Error('All OpenAI models failed');
+}
+
+/* ── Anthropic ── */
+async function callAnthropicPlanner({ userQuery, articles, apiKey, signal, isClarifyPhase = false, categoryStats = null }) {
+  const intent = detectQueryIntent(userQuery);
+  let prompt = '';
+  if (isClarifyPhase) {
+    const stats = categoryStats || computeCategoryStats(articles, userQuery);
+    const available = [
+      stats.snack > 0 && `在地小吃（${stats.snack} 篇）`,
+      stats.store > 0 && `特色店家（${stats.store} 篇）`,
+      stats.sight > 0 && `景點探索（${stats.sight} 篇）`,
+      stats.gift  > 0 && `伴手禮採買（${stats.gift} 篇）`,
+      stats.event > 0 && `活動體驗（${stats.event} 篇）`,
+    ].filter(Boolean);
+    prompt = buildClarifyPrompt(userQuery, stats, available);
+  } else {
+    const poolArticles = buildSmartPool(articles, intent);
+    const context      = buildArticleContext(poolArticles);
+    prompt = buildPlanPrompt(userQuery, buildIntentSummary(intent), poolArticles.length, context);
+  }
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }] }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(`Anthropic: ${data.error.message}`);
+    const text = data.content?.[0]?.text;
+    if (!text) throw new Error('Anthropic: empty response');
+    return { result: JSON.parse(extractJson(text)), model: ANTHROPIC_MODEL };
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    throw new Error(`Anthropic: ${e.message}`);
+  }
 }
 
 
@@ -2394,7 +2300,7 @@ function TravelPlanner({ articles }) {
   const [busy, setBusy]             = useState(false);
   const [apiErr, setApiErr]         = useState('');
   const [active, setActive]         = useState(null);
-  const [hasKey, setHasKey]         = useState(() => !!localStorage.getItem('gemini_key'));
+  const [hasKey, setHasKey]         = useState(() => !!getActiveAI().key);
   const [inputCollapsed, setInputCollapsed] = useState(false);
   const [isDemo, setIsDemo]         = useState(false);
   const [detailArticle, setDetailArticle] = useState(null);
@@ -2411,7 +2317,7 @@ function TravelPlanner({ articles }) {
   const abortRef = useRef(null);
 
   useEffect(() => {
-    const t = setInterval(() => setHasKey(!!localStorage.getItem('gemini_key')), 1500);
+    const t = setInterval(() => setHasKey(!!getActiveAI().key), 1500);
     return () => clearInterval(t);
   }, []);
 
@@ -2453,7 +2359,7 @@ function TravelPlanner({ articles }) {
   const geotagged = useMemo(() => articles.filter(hasRealCoords), [articles]);
 
   /* ── submit via API ── */
-  const runApi = useCallback(async (q, key, isClarifyPhase = true) => {
+  const runApi = useCallback(async (q, isClarifyPhase = true) => {
     setBusy(true); setApiErr('');
 
     // 只有在「給行程階段」才清掉舊結果
@@ -2468,8 +2374,8 @@ function TravelPlanner({ articles }) {
       // 在送給 Gemini 之前，先在前端算出資料庫分布，讓提問更有針對性
       const categoryStats = isClarifyPhase ? computeCategoryStats(articles, q) : null;
 
-      const { result } = await callGeminiPlanner({
-        userQuery: q, articles, apiKey: key,
+      const { result } = await callAIPlanner({
+        userQuery: q, articles,
         signal: abortRef.current.signal,
         isClarifyPhase, categoryStats,
       });
@@ -2492,8 +2398,8 @@ function TravelPlanner({ articles }) {
 
   const submit = () => {
     const q = draft.trim(); if (!q) return;
-    const key = localStorage.getItem('gemini_key');
-    if (!key) { setApiErr('尚未設定 Gemini API Key，請點右上角齒輪圖示設定'); return; }
+    const { key } = getActiveAI();
+    if (!key) { setApiErr('尚未設定 API Key，請點右上角齒輪圖示設定'); return; }
 
     const days    = detectDays(q);
     const intent  = detectQueryIntent(q);
@@ -2513,7 +2419,7 @@ function TravelPlanner({ articles }) {
     setQuery(q);
     setClarification(null);
     setPreCheck(null);
-    runApi(q, key, false);
+    runApi(q, false);
   };
 
   /**
@@ -2521,7 +2427,7 @@ function TravelPlanner({ articles }) {
    * 把天數與風格附加到原始查詢，組成更精準的 query，再送給 Gemini。
    */
   const handlePreCheckComplete = useCallback((days, style) => {
-    const key = localStorage.getItem('gemini_key');
+    const { key } = getActiveAI();
     if (!key) return;
 
     const STYLE_LABELS = {
@@ -2544,18 +2450,18 @@ function TravelPlanner({ articles }) {
     setQuery(augmented);
     setPreCheck(null);
     setClarification(null);
-    runApi(augmented, key, false);  // 前端已引導完畢，直接生成行程
+    runApi(augmented, false);  // 前端已引導完畢，直接生成行程
   }, [draft, runApi]);
 
   /* ── 使用者點選選項按鈕 → 合併需求 → 直接要行程 ── */
   const handleOptionSelect = useCallback((opt) => {
-    const key = localStorage.getItem('gemini_key');
+    const { key } = getActiveAI();
     if (!key) return;
     const combined = `${initialQuery}。補充偏好：${opt}`;
     setDraft(combined);
     setQuery(combined);
     setClarification(null);
-    runApi(combined, key, false);  // 已取得偏好，直接要行程
+    runApi(combined, false);  // 已取得偏好，直接要行程
   }, [initialQuery, runApi]);
 
   /* ── 手機底部 Sheet：touch 手勢 + 點擊切換 ── */
@@ -2587,12 +2493,12 @@ function TravelPlanner({ articles }) {
 
   /* ── preset card click ── */
   const handlePresetClick = useCallback((preset) => {
-    const key = localStorage.getItem('gemini_key');
+    const { key } = getActiveAI();
     setQuery(preset.title);
     setClarification(null);  // 清掉提問氣泡
     if (key) {
       setDraft(preset.query);
-      runApi(preset.query, key, true);  // 預設卡片也走提問流程
+      runApi(preset.query, true);  // 預設卡片也走提問流程
     } else {
       const demo = DEMO_PLANS[preset.key];
       if (!demo) return;
@@ -3357,7 +3263,7 @@ class ErrorBoundary extends React.Component {
    Mount
    ============================================================ */
 
-window.__GEMINI_KEY__ = localStorage.getItem('gemini_key') || '';
+// AI key managed via getActiveAI() — supports Gemini, OpenAI, Anthropic
 createRoot(document.getElementById('root')).render(
   <ErrorBoundary><App /></ErrorBoundary>
 );
