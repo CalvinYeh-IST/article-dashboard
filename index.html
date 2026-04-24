@@ -1145,7 +1145,7 @@ function StrategicManagement({ articles }) {
               <div className="text-[40px] font-light leading-none tracking-tight mt-1 mb-2 text-[#A35200]">{unpub}</div>
               <div className="text-[10px] text-[#A35200] mb-2.5">= 總數 {total} − 中文稿上架 {cnPub}</div>
               <div className="flex flex-col gap-1.5">
-                {[['待上架', '長官尚未簽核'], ['待複審', '長官尚未審閱'], ['待初審', '編輯尚未潤稿']].map(([s, hint]) => (
+                {[['待上架', '待長官簽核上架or缺照片'], ['待複審', '長官複審or文編修稿中'], ['待初審', '文編未改稿']].map(([s, hint]) => (
                   <div key={s} className="flex justify-between items-center bg-white/70 px-2.5 py-1.5">
                     <span className="text-[11px] text-[#A35200]">
                       {s}<span className="text-[9px] text-[#C8782A] ml-1">({hint})</span>
