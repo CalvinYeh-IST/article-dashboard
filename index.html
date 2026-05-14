@@ -307,13 +307,35 @@ const C = {
    【B】Utilities — 精確從 main.js v6.0 移植
    ============================================================ */
 
-/** 判斷日期欄位是否為有效上架日（排除 "-"、"--"、"—"、"N/A"、空字串） */
+/**
+ * 判斷日期欄位是否為有效上架日
+ * 排除：空值、純佔位符（-/N/A）、中文狀態標記（0512發譯 / 0519預計上架）
+ * 僅接受 YYYY-MM-DD 標準日期格式（需以 4 位年份 + 連字號開頭）
+ */
 function hasDate(d) {
   if (!d) return false;
   const s = String(d).trim();
   if (s.length < 6) return false;
   if (/^[\s\-—–/NAna]+$/i.test(s)) return false;
-  return true;
+  if (/發譯|預計|上架/.test(s)) return false;
+  return /^\d{4}-/.test(s);
+}
+
+/**
+ * 從日期欄位擷取待處理狀態標記
+ * 例：「0512發譯」→ {type:'translating', label:'0512 發譯中'}
+ *     「0519預計上架」→ {type:'expected', label:'0519 預計上架'}
+ * 若無標記則回傳 null
+ */
+function getPendingStatus(d) {
+  if (!d) return null;
+  const s = String(d).trim();
+  if (!s) return null;
+  const mDate = s.match(/^(\d{4})/);
+  const datePart = mDate ? mDate[1] : '';
+  if (/發譯/.test(s)) return { type: 'translating', label: datePart ? `${datePart} 發譯中` : '發譯中' };
+  if (/預計|上架/.test(s)) return { type: 'expected', label: datePart ? `${datePart} 預計上架` : '預計上架' };
+  return null;
 }
 
 /** 百分比計算，分母為 0 時回傳 0 */
@@ -1087,6 +1109,14 @@ function StrategicManagement({ articles }) {
 
   const stuck = useMemo(() => computeStuck(articles), [articles]);
 
+  const pendingStats = useMemo(() => ({
+    translating: articles.filter((a) => getPendingStatus(a.dateEn)?.type === 'translating').length,
+    expected: Math.max(
+      articles.filter((a) => getPendingStatus(a.dateZh)?.type === 'expected').length,
+      articles.filter((a) => getPendingStatus(a.dateEn)?.type === 'expected').length,
+    ),
+  }), [articles]);
+
   const monthStats = useMemo(() => getMonthlyStatsFromArticles(articles, FIXED_YEAR), [articles]);
 
   return (
@@ -1157,6 +1187,22 @@ function StrategicManagement({ articles }) {
                   <div className="flex justify-between items-center bg-white/50 px-2.5 py-1.5">
                     <span className="text-[11px] text-[#6B6B6B]">其他</span>
                     <span className="text-[13px] font-medium text-[#6B6B6B]">{otherUnpub} 篇</span>
+                  </div>
+                )}
+                {pendingStats.translating > 0 && (
+                  <div className="flex justify-between items-center px-2.5 py-1.5" style={{ background: 'rgba(254,243,199,0.7)', borderTop: '1px solid #FDE68A' }}>
+                    <span className="text-[11px]" style={{ color: '#A35200' }}>
+                      發譯中<span className="text-[9px] ml-1" style={{ color: '#C8782A' }}>(英文稿製作中)</span>
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 font-semibold" style={{ background: '#FEF3C7', color: '#A35200' }}>{pendingStats.translating} 篇</span>
+                  </div>
+                )}
+                {pendingStats.expected > 0 && (
+                  <div className="flex justify-between items-center px-2.5 py-1.5" style={{ background: 'rgba(251,240,232,0.7)' }}>
+                    <span className="text-[11px]" style={{ color: '#C8621E' }}>
+                      預計上架<span className="text-[9px] ml-1" style={{ color: '#C8782A' }}>(排程中)</span>
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 font-semibold" style={{ background: '#FBF0E8', color: '#C8621E' }}>{pendingStats.expected} 篇</span>
                   </div>
                 )}
               </div>
@@ -1254,6 +1300,19 @@ function StrategicManagement({ articles }) {
                     ))}
                   </div>
                 </details>
+              )}
+              {pendingStats.translating > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 font-semibold"
+                    style={{ background: '#FEF3C7', color: '#A35200' }}
+                  >
+                    {pendingStats.translating} 篇發譯中
+                  </span>
+                  <span className="text-[10px]" style={{ color: stuck.length > 0 ? '#B91C1C' : '#1A6B45' }}>
+                    英文稿製作中
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -1618,6 +1677,27 @@ function SubdirBarChart({ articles, height }) {
    【I】Tab 3: Article Management — 文章查詢 + 詳情 Modal
    ============================================================ */
 
+/** 日期欄位單元格：有效日期→灰色文字；狀態標記→色彩 Badge；空值→— */
+function DateStatusCell({ d }) {
+  const ps = getPendingStatus(d);
+  if (ps) {
+    const isTranslating = ps.type === 'translating';
+    return (
+      <span
+        className="inline-block text-[10px] px-1.5 py-0.5 font-semibold whitespace-nowrap"
+        style={{
+          background: isTranslating ? '#FEF3C7' : '#FBF0E8',
+          color:      isTranslating ? '#A35200' : '#C8621E',
+        }}
+      >
+        {ps.label}
+      </span>
+    );
+  }
+  if (!d || !hasDate(d)) return <span className="text-[#9A9A96]">—</span>;
+  return <span className="text-[#6B6B6B]">{d}</span>;
+}
+
 function ArticleManagement({ articles }) {
   const [q, setQ]           = useState('');
   const [status, setStatus] = useState('');
@@ -1729,8 +1809,8 @@ function ArticleManagement({ articles }) {
                     <Td className="text-[#1C1C1C] font-medium" title={a.title} truncate>{a.title}</Td>
                     <Td><StatusBadge status={a.status} /></Td>
                     <Td className="text-[#6B6B6B]" truncate>{[a.city, a.area].filter(Boolean).join(' · ')}</Td>
-                    <Td className="text-[#6B6B6B]">{a.dateZh || '—'}</Td>
-                    <Td className="text-[#6B6B6B]">{hasDate(a.dateEn) ? a.dateEn : '—'}</Td>
+                    <Td><DateStatusCell d={a.dateZh} /></Td>
+                    <Td><DateStatusCell d={a.dateEn} /></Td>
                     <Td truncate>
                       {asArr(a.theme).slice(0, 2).map((t) => (
                         <span key={t} className="text-[10px] px-1.5 py-0.5 mr-1 bg-[#EEEDFE] text-[#3C3489]">{t}</span>

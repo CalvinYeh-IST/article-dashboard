@@ -126,15 +126,33 @@ function getArr(a,k){
 
 /**
  * 判斷日期欄位是否為有效上架日
- * content.json 未上架的 dateEn 常見填法："-"、"--"、"—"、"N/A"、空字串
- * 規則：有內容、長度 >= 6、不是純符號佔位
+ * 排除：空值、純佔位符（-/N/A）、中文狀態標記（0512發譯 / 0519預計上架）
+ * 僅接受 YYYY-MM-DD 標準日期格式（需以 4 位年份 + 連字號開頭）
  */
 function hasDate(d){
   if(!d) return false;
   const s = String(d).trim();
   if(s.length < 6) return false;
   if(/^[-—–/\ Na]+$/.test(s)) return false;  // 排除 "-"、"--"、"N/A" 等佔位
-  return true;
+  if(/發譯|預計|上架/.test(s)) return false;   // 排除「0512發譯」「0519預計上架」等狀態標記
+  return /^\d{4}-/.test(s);                   // 僅接受 YYYY-MM-DD 標準日期格式
+}
+
+/**
+ * 從日期欄位擷取待處理狀態標記
+ * 例：「0512發譯」→ {type:'translating', label:'0512 發譯中'}
+ *     「0519預計上架」→ {type:'expected', label:'0519 預計上架'}
+ * 若無標記則回傳 null
+ */
+function getPendingStatus(d){
+  if(!d) return null;
+  const s = String(d).trim();
+  if(!s) return null;
+  const mDate = s.match(/^(\d{4})/);
+  const datePart = mDate ? mDate[1] : '';
+  if(/發譯/.test(s)) return {type:'translating', label: datePart ? `${datePart} 發譯中` : '發譯中'};
+  if(/預計|上架/.test(s)) return {type:'expected', label: datePart ? `${datePart} 預計上架` : '預計上架'};
+  return null;
 }
 
 /** ISO 週次計算 */
@@ -470,8 +488,8 @@ function renderMgr(){
   const globalEnPub=arts.filter(a=>hasDate(a.dateEn)).length;
   const globalTransRate=pct(globalEnPub,globalCnPub);
 
-  // 翻譯卡關（中文已上架超過 7 天但英文未上架）
-  const stuck=arts.filter(a=>a.dateZh&&!hasDate(a.dateEn)&&(today-new Date(a.dateZh))/86400000>7).length;
+  // 翻譯卡關（中文已上架超過 7 天但英文未上架；使用 hasDate 確保狀態標記不被誤算）
+  const stuck=arts.filter(a=>hasDate(a.dateZh)&&!hasDate(a.dateEn)&&(today-new Date(a.dateZh))/86400000>7).length;
 
   // 最新週別庫存（仍從 weekly.json 取庫存盤點數）
   const lastWeek=weeks.length>0?weeks[weeks.length-1]:null;
@@ -836,6 +854,19 @@ function renderActionSection(w,stuck){
 }
 
 // ===== 【3】分頁三：後台編輯版 =====
+
+/** 日期欄位 HTML：有效日期→灰色文字；狀態標記→色彩 Badge；空值→— */
+function dateCellHtml(d){
+  if(!d) return '<span style="color:#9A9A96">—</span>';
+  const ps=getPendingStatus(d);
+  if(ps){
+    const bg=ps.type==='translating'?'#FEF3C7':'#FBF0E8';
+    const color=ps.type==='translating'?'#A35200':'#C8621E';
+    return `<span style="font-size:10px;padding:2px 7px;border-radius:2px;background:${bg};color:${color};font-weight:600;white-space:nowrap">${ps.label}</span>`;
+  }
+  return `<span style="color:#6B6B6B">${d}</span>`;
+}
+
 function renderOps(){
   const opsEl=document.getElementById('view-ops');
   if(!opsEl.querySelector('table')){
@@ -875,8 +906,8 @@ function renderOps(){
       <td style="color:#6B6B6B">${a.year}</td>
       <td title="${a.title}">${a.title}</td>
       <td><span class="sbadge ${smap[a.status]||''}">${a.status}</span></td>
-      <td style="color:#6B6B6B">${a.dateZh||'—'}</td>
-      <td style="color:#6B6B6B">${a.dateEn||'—'}</td>
+      <td>${dateCellHtml(a.dateZh)}</td>
+      <td>${dateCellHtml(a.dateEn)}</td>
       <td><button style="font-size:11px;padding:2px 8px;border-radius:2px;cursor:pointer;border:1px solid ${C_EDGE};background:#fff;color:#6B6B6B" onclick="openModal(${a.id})">編輯</button></td>
     </tr>`).join('');
 }
